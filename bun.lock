@@ -10,6 +10,10 @@
         "typescript": "5.9.3",
       },
     },
+    "packages/lrc": {
+      "name": "@musicbutler/lrc",
+      "version": "0.0.1",
+    },
     "packages/shared": {
       "name": "@musicbutler/shared",
       "version": "0.0.1",
@@ -36,6 +40,8 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.5.12", "", { "os": "win32", "cpu": "arm64" }, "sha512-b9vtoZFsuZt1pdjNwJvXl0f+BpayRzV008uS2+JpmwIKdSE2qdu4A/l04FESwLoou5g2E/Qlec0xwJydZplH+A=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.12", "", { "os": "win32", "cpu": "x64" }, "sha512-B1R/l+CwEpKFSuqiwePzPNRk1EiJN8kc0UhdafNz6MZN9v5OFP9HYP1irptvWzHrwVI4blVNGMbxc5zt70m3IA=="],
+
+    "@musicbutler/lrc": ["@musicbutler/lrc@workspace:packages/lrc"],
 
     "@musicbutler/shared": ["@musicbutler/shared@workspace:packages/shared"],
 
