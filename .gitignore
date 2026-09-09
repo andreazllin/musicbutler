@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.env
+*.local
+*.tsbuildinfo
+.tmp/
+# atomic-write temp files that a crash may leave behind (docs/PLAN.md §5.2)
+*.lrc.tmp-*
+# downloaded model weights
+/models/
+packages/align/fixtures/**/*.wav
+packages/align/fixtures/**/*.aiff
+# fixture music library used by `bun run dev`
+/fixtures/library/**/*.lrc
+# ...except the one seed file the fixture tests rely on
+!/fixtures/library/Artist One/Album A/02 Second Song.lrc

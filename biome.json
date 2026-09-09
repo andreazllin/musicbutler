@@ -1,0 +1,120 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"includes": ["**", "!**/node_modules", "!**/dist", "!**/fixtures", "!**/*.lrc", "!bun.lock"]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 100
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"semicolons": "always",
+			"trailingCommas": "all"
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"suspicious": {
+				"noExplicitAny": "error"
+			},
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error"
+			}
+		}
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": [
+				"apps/web/src/components/**",
+				"apps/web/src/hooks/use-breakpoint.ts",
+				"apps/web/src/hooks/use-clipboard.ts",
+				"apps/web/src/hooks/use-resize-observer.ts",
+				"apps/web/src/utils/**"
+			],
+			"formatter": {
+				"indentStyle": "space",
+				"indentWidth": 4,
+				"lineWidth": 160
+			},
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off",
+						"noArrayIndexKey": "off",
+						"useIterableCallbackReturn": "off"
+					},
+					"a11y": {
+						"recommended": false
+					},
+					"complexity": {
+						"noUselessFragments": "off",
+						"useOptionalChain": "off"
+					},
+					"style": {
+						"noNonNullAssertion": "off",
+						"useTemplate": "off"
+					},
+					"correctness": {
+						"useExhaustiveDependencies": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/web/src/styles/**"],
+			"formatter": {
+				"enabled": false
+			},
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noImportantStyles": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/server/src/**", "!apps/server/src/fs/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"node:fs": "Only apps/server/src/fs/** may touch the filesystem (docs/PLAN.md \u00a75.3).",
+									"node:fs/promises": "Only apps/server/src/fs/** may touch the filesystem (docs/PLAN.md \u00a75.3).",
+									"fs": "Only apps/server/src/fs/** may touch the filesystem (docs/PLAN.md \u00a75.3).",
+									"fs/promises": "Only apps/server/src/fs/** may touch the filesystem (docs/PLAN.md \u00a75.3)."
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	],
+	"css": {
+		"parser": {
+			"cssModules": true
+		}
+	}
+}

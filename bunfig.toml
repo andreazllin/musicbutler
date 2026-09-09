@@ -1,0 +1,14 @@
+# Bun configuration for the musicbutler workspace.
+#
+# `trustedDependencies` (the packages whose postinstall scripts may run) is a
+# package.json field, not a bunfig key, so it lives in ./package.json. Both
+# `bun pm trust --all` and the Dockerfile write to that field. Without it the
+# `onnxruntime-node` postinstall never runs (docs/PLAN.md §13.15).
+
+[install]
+# Reproducible installs: always pin exact versions on `bun add`.
+exact = true
+
+[test]
+# Every workspace keeps its tests next to its source under `test/`.
+root = "."
