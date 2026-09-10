@@ -1,0 +1,124 @@
+name: Release image
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/musicbutler
+jobs:
+  # The image is built only when the same checks that ci.yml runs are green.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun pm trust --all || true
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun test
+
+  # One native build per architecture (docs/PLAN.md §9.4: never drop arm64; QEMU
+  # is too slow for the ONNX dependencies). Each pushes by digest; `merge` joins them.
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: arch
+        run: echo "name=${{ matrix.platform }}" | sed 's#/#-#g' >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push by digest (English)
+        id: en
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=en-${{ steps.arch.outputs.name }}
+          cache-to: type=gha,mode=max,scope=en-${{ steps.arch.outputs.name }}
+      - name: Build and push by digest (multilang, docs/PLAN.md §13.16)
+        id: multi
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          build-args: WITH_IT_MODEL=1
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=en-${{ steps.arch.outputs.name }}
+          cache-to: type=gha,mode=max,scope=multi-${{ steps.arch.outputs.name }}
+      - name: Export digests
+        run: |
+          mkdir -p /tmp/digests/en /tmp/digests/multi
+          # Artifact file names may not contain ":", so the `sha256:` prefix is dropped here and re-added in `merge`.
+          en="${{ steps.en.outputs.digest }}"; touch "/tmp/digests/en/${en#sha256:}"
+          multi="${{ steps.multi.outputs.digest }}"; touch "/tmp/digests/multi/${multi#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ steps.arch.outputs.name }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Self-hosted lyrics sync for a Navidrome library
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+      - name: Create the English manifest list
+        working-directory: /tmp/digests/en
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+      - name: Create the multilang manifest list
+        working-directory: /tmp/digests/multi
+        run: |
+          TAGS="-t ${{ env.IMAGE }}:latest-multilang"
+          case "${GITHUB_REF}" in refs/tags/v*) TAGS="$TAGS -t ${{ env.IMAGE }}:${GITHUB_REF#refs/tags/v}-multilang";; esac
+          docker buildx imagetools create $TAGS $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+      - name: Inspect
+        run: |
+          docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.IMAGE }}:latest-multilang

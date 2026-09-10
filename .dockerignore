@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+**/node_modules
+**/dist
+docs
+fixtures
+*.md
+!README.md
+.env
+.env.*
+!.env.example
+.DS_Store
+packages/align/fixtures/**/*.wav
+packages/align/fixtures/**/*.aiff
+docker-compose*.yml

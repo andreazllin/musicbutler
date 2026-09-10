@@ -1,0 +1,40 @@
+# musicbutler: published image, no build step (docs/PLAN.md §9.3).
+# Quickstart:
+#   echo 'NAVIDROME_MUSIC_DIR=/path/to/your/music' > .env
+#   docker compose up -d
+services:
+  musicbutler:
+    image: ghcr.io/andreazllin/musicbutler:latest   # pin a version for stability, e.g. :0.0.1
+    environment:
+      MUSIC_DIR: /music
+      PORT: "3000"
+      # PUID/PGID: must match the owner of your music library
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+    volumes:
+      # read-write on purpose: this is where .lrc files are written
+      - ${NAVIDROME_MUSIC_DIR:?set NAVIDROME_MUSIC_DIR in .env}:/music
+    ports:
+      - "127.0.0.1:3000:3000"   # never 0.0.0.0 without the auth proxy below
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# Uncomment to expose musicbutler beyond localhost behind HTTP basic auth.
+# Generate the hash with: docker run --rm caddy:2-alpine caddy hash-password
+# Then write ./Caddyfile:
+#   :8080 {
+#     basic_auth {
+#       admin <hash>
+#     }
+#     reverse_proxy musicbutler:3000
+#   }
+#
+#  caddy:
+#    image: caddy:2-alpine
+#    ports: ["8080:8080"]
+#    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro"]
+#    depends_on: [musicbutler]

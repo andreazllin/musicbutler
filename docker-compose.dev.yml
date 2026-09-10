@@ -1,0 +1,28 @@
+# Local build with bind mounts and hot reload (docs/PLAN.md §9.5).
+#   docker compose -f docker-compose.dev.yml up --build
+# The library is a copy of the fixture library so nothing real is touched.
+services:
+  musicbutler:
+    build:
+      context: .
+      args:
+        WITH_IT_MODEL: "${WITH_IT_MODEL:-0}"
+    environment:
+      MUSIC_DIR: /music
+      MODEL_CACHE_DIR: /models
+      PORT: "3000"
+      LOG_LEVEL: debug
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+    volumes:
+      - ${DEV_MUSIC_DIR:-./fixtures/library}:/music
+      - ./apps/server/src:/app/apps/server/src:ro
+      - ./packages:/app/packages:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    command: ["bun", "--watch", "apps/server/src/index.ts"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
