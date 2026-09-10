@@ -1,0 +1,26 @@
+{
+	"name": "@musicbutler/server",
+	"version": "0.0.1",
+	"license": "AGPL-3.0-only",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./router": "./src/routers/index.ts"
+	},
+	"scripts": {
+		"dev": "MUSIC_DIR=${MUSIC_DIR:-../../fixtures/library} MODEL_CACHE_DIR=${MODEL_CACHE_DIR:-$HOME/.cache/musicbutler} bun --watch src/index.ts",
+		"start": "bun src/index.ts",
+		"build": "bun build src/index.ts --target bun --outdir dist",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"dependencies": {
+		"@hono/trpc-server": "0.4.2",
+		"@musicbutler/align": "workspace:*",
+		"@musicbutler/lrc": "workspace:*",
+		"@musicbutler/shared": "workspace:*",
+		"@trpc/server": "11.18.0",
+		"hono": "4.13.7",
+		"zod": "4.4.0"
+	}
+}
