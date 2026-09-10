@@ -1,0 +1,41 @@
+.list {
+	min-height: 0;
+	flex: 1;
+	overflow-y: auto;
+	scroll-padding-block: 2rem;
+	list-style: none;
+	margin: 0;
+	padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+}
+
+.line {
+	display: block;
+	width: 100%;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	font: inherit;
+	font-size: var(--mantine-font-size-sm);
+	color: var(--mantine-color-dimmed);
+	padding: 4px var(--mantine-spacing-xs);
+	border-radius: var(--mantine-radius-sm);
+	cursor: pointer;
+	transition:
+		background-color 100ms ease,
+		color 100ms ease;
+}
+
+.line:hover {
+	background-color: var(--mantine-color-default-hover);
+}
+
+/* Lines already played read back one step, so the eye lands on the active one. */
+.past {
+	opacity: 0.55;
+}
+
+.active {
+	color: var(--mantine-color-text);
+	font-weight: 600;
+	background-color: var(--mantine-primary-color-light);
+}

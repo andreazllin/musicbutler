@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="musicbutler: maintain a Navidrome music library" />
+        <meta name="theme-color" content="#7f56d9" />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet" />
+
+        <title>musicbutler</title>
+        <script>
+            // Applied before React mounts to avoid a flash of the wrong scheme. This is
+            // what Mantine's <ColorSchemeScript> writes on the server; a Vite SPA has no
+            // server, so the same work happens here. Keep the key and the attribute
+            // equal to what @mantine/core reads.
+            (() => {
+                const stored = localStorage.getItem("mantine-color-scheme-value");
+                const scheme = stored === "light" || stored === "dark" ? stored : "auto";
+                document.documentElement.setAttribute("data-mantine-color-scheme", scheme === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : scheme);
+            })();
+        </script>
+    </head>
+
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

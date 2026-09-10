@@ -1,0 +1,22 @@
+/*
+ * App-level CSS. Everything that can be a Mantine prop or a CSS module is one;
+ * what is left here is the page frame and the few element defaults the library
+ * does not own.
+ */
+
+html,
+body,
+#root {
+	height: 100%;
+}
+
+body {
+	font-family: var(--mantine-font-family);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide the default clear button (X) from search inputs; the filter box has its own. */
+input[type="search"]::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+}

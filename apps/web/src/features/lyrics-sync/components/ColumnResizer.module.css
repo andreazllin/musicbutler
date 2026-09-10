@@ -1,0 +1,17 @@
+.resizer {
+	width: 6px;
+	flex-shrink: 0;
+	cursor: col-resize;
+	background-color: var(--mantine-color-default-border);
+	transition: background-color 100ms ease;
+}
+
+.resizer:hover,
+.resizer:focus-visible {
+	background-color: var(--mantine-primary-color-filled);
+}
+
+.resizer:focus-visible {
+	outline: 2px solid var(--mantine-primary-color-filled);
+	outline-offset: -1px;
+}

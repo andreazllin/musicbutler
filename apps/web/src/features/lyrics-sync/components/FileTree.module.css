@@ -1,0 +1,53 @@
+.node {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	height: 32px;
+	padding-right: var(--mantine-spacing-xs);
+	border-radius: var(--mantine-radius-sm);
+	font-size: var(--mantine-font-size-sm);
+	color: var(--mantine-color-text);
+	user-select: none;
+	cursor: default;
+}
+
+.node:hover {
+	background-color: var(--mantine-color-default-hover);
+}
+
+.node[data-selected] {
+	background-color: var(--mantine-primary-color-light);
+	color: var(--mantine-primary-color-light-color);
+}
+
+.chevron {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+	color: var(--mantine-color-dimmed);
+	transition: transform 120ms ease;
+}
+
+.chevronExpanded {
+	transform: rotate(90deg);
+}
+
+/* Audio rows have no chevron; the spacer keeps their label on the folder grid. */
+.chevronSpacer {
+	flex-shrink: 0;
+	width: 24px;
+}
+
+.status {
+	display: flex;
+	align-items: center;
+	height: 32px;
+	padding-left: var(--mantine-spacing-md);
+	font-size: var(--mantine-font-size-xs);
+	font-style: italic;
+	color: var(--mantine-color-dimmed);
+}
