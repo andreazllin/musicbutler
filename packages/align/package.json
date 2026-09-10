@@ -1,0 +1,22 @@
+{
+	"name": "@musicbutler/align",
+	"version": "0.0.1",
+	"license": "AGPL-3.0-only",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"bin": {
+		"musicbutler-align": "./src/cli.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"cli": "bun run src/cli.ts"
+	},
+	"dependencies": {
+		"@huggingface/transformers": "4.2.0",
+		"@musicbutler/shared": "workspace:*",
+		"onnxruntime-node": "1.24.3"
+	}
+}
