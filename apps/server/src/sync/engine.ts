@@ -1,8 +1,12 @@
 /**
  * Wiring between the tRPC `sync.*` procedures and `packages/align`
- * (docs/PLAN.md §8). This module owns: loading the engine once per language,
- * mapping engine stages to `SyncStage` percentages, the 2 s progress heartbeat,
- * the write stage (§8.2 rule 2) and the error mapping (§13.17).
+ * (docs/PLAN.md §8). This module owns: mapping engine stages to `SyncStage`
+ * percentages, the 2 s progress heartbeat, the write stage (§8.2 rule 2) and
+ * the error mapping (§13.17).
+ *
+ * The alignment itself runs on a worker thread (`pool.ts`), because it blocks
+ * whatever thread it is on. This module stays on the server's thread, so it
+ * keeps every read and write to the library (docs/PLAN.md §5.3).
  *
  * The engine is imported lazily so that `getEnv()` has exported
  * `MUSICBUTLER_CACHE` before `packages/align` reads it (§13.14).
@@ -20,9 +24,9 @@ import { writeLrcAtomic } from "../fs/library.ts";
 import { resolveLibraryPath } from "../fs/paths.ts";
 import type { Job } from "../jobs/registry.ts";
 import { log } from "../log.ts";
+import { AlignAborted, AlignFailed, runAlignment } from "./pool.ts";
 
 type AlignModule = typeof import("@musicbutler/align");
-type Engine = InstanceType<AlignModule["LyricsSync"]>;
 
 let alignModule: Promise<AlignModule> | undefined;
 
@@ -31,27 +35,6 @@ export function loadAlign(): Promise<AlignModule> {
 	getEnv();
 	alignModule ??= import("@musicbutler/align");
 	return alignModule;
-}
-
-const engines = new Map<Lang, Promise<Engine>>();
-
-/** One loaded engine per language, reused across jobs (models stay in memory). */
-export function getEngine(lang: Lang): Promise<Engine> {
-	let engine = engines.get(lang);
-	if (!engine) {
-		engine = loadAlign().then(async ({ LyricsSync }) => {
-			const e = new LyricsSync({ lang });
-			try {
-				await e.load();
-			} catch (err) {
-				engines.delete(lang);
-				throw err;
-			}
-			return e;
-		});
-		engines.set(lang, engine);
-	}
-	return engine;
 }
 
 export interface LanguageInfo {
@@ -140,25 +123,31 @@ async function run(job: Job, input: SyncJobInput): Promise<void> {
 			return;
 		}
 		const absAudio = await resolveLibraryPath(input.audioPath);
-		const { AlignError, AbortError } = await loadAlign();
-		const engine = await getEngine(input.lang);
 		if (job.signal.aborted) return;
 
 		try {
-			const result = await engine.syncText(absAudio, lines.join("\n"), {
-				signal: job.signal,
-				separate: isolateVocals,
-				onProgress: (stage, done, total) => {
-					const [from, to] = spans[stage];
-					const frac = total > 0 ? Math.min(1, done / total) : 1;
-					emit({
-						type: "progress",
-						stage: STAGE_MAP[stage],
-						pct: Math.round((from + (to - from) * frac) * 10) / 10,
-						message: stage === "separate" || stage === "emit" ? `${done}/${total}` : undefined,
-					});
+			const result = await runAlignment(
+				{
+					audioPath: absAudio,
+					lyrics: lines.join("\n"),
+					lang: input.lang,
+					separate: isolateVocals,
+					signal: job.signal,
+					onProgress: (stage, done, total) => {
+						const span = spans[stage as EngineStage];
+						if (!span) return;
+						const [from, to] = span;
+						const frac = total > 0 ? Math.min(1, done / total) : 1;
+						emit({
+							type: "progress",
+							stage: STAGE_MAP[stage as EngineStage],
+							pct: Math.round((from + (to - from) * frac) * 10) / 10,
+							message: stage === "separate" || stage === "emit" ? `${done}/${total}` : undefined,
+						});
+					},
 				},
-			});
+				getEnv().MODEL_CACHE_DIR,
+			);
 			if (job.signal.aborted) return;
 
 			emit({ type: "progress", stage: "write", pct: 98 });
@@ -170,8 +159,8 @@ async function run(job: Job, input: SyncJobInput): Promise<void> {
 			const mtimeMs = await writeLrcAtomic(input.audioPath, content);
 			emit({ type: "done", content, mtimeMs });
 		} catch (err) {
-			if (job.signal.aborted || err instanceof AbortError) return;
-			if (err instanceof AlignError) {
+			if (job.signal.aborted || err instanceof AlignAborted) return;
+			if (err instanceof AlignFailed) {
 				emit({
 					type: "error",
 					code: "ALIGN_FAILED",
