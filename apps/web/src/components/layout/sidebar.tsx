@@ -1,8 +1,19 @@
-import { ActionIcon, Center, Stack, Tooltip } from "@mantine/core";
+import { ActionIcon, Anchor, Center, Stack, Tooltip } from "@mantine/core";
+import { IconBrandGithub } from "@tabler/icons-react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { FunctionComponent } from "react";
 import { TOOLS } from "@/features/registry";
+import { SOURCE_URL } from "@/lib/source";
 import { ThemeToggle } from "./theme-toggle";
+
+/** The source offer that AGPL-3.0 section 13 asks a network application to make. */
+const SourceLink: FunctionComponent = () => (
+    <Tooltip label="Source code (AGPL-3.0)" position="right" withArrow>
+        <Anchor href={SOURCE_URL} target="_blank" rel="noreferrer" aria-label="Source code, licensed AGPL-3.0" c="dimmed" display="flex">
+            <IconBrandGithub size={18} />
+        </Anchor>
+    </Tooltip>
+);
 
 /**
  * The app sidebar (docs/PLAN.md §7.1). It renders one icon button per registered
@@ -57,6 +68,7 @@ export const Sidebar: FunctionComponent = () => {
                 })}
             </Stack>
             <Stack gap="xs" mt="auto" align="center">
+                <SourceLink />
                 <ThemeToggle />
             </Stack>
         </Stack>
