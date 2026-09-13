@@ -82,7 +82,7 @@ feat(align): add the alignment engine and wire it into server sync
 fix(web): give the volume slider a width and guard the slider values
 ci: build images natively per arch and merge them into multi-arch manifests
 docs: document MUSICBUTLER_ASR_EN and MUSICBUTLER_ASR_IT
-chore(release): v0.0.1
+chore(release): v0.0.2
 ```
 
 ## Before you commit

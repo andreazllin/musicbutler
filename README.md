@@ -27,7 +27,7 @@ The compose file, in full:
 ```yaml
 services:
   musicbutler:
-    image: ghcr.io/andreazllin/musicbutler:latest   # pin a version for stability, e.g. :0.0.1
+    image: ghcr.io/andreazllin/musicbutler:latest   # pin a version for stability, e.g. :0.0.2
     environment:
       MUSIC_DIR: /music
       MUSICBUTLER_LANGS: "${MUSICBUTLER_LANGS:-en-US}"   # en-US, it-IT

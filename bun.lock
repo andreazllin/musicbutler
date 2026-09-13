@@ -12,7 +12,7 @@
     },
     "apps/server": {
       "name": "@musicbutler/server",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@hono/trpc-server": "0.4.2",
         "@musicbutler/align": "workspace:*",
@@ -25,7 +25,7 @@
     },
     "apps/web": {
       "name": "@musicbutler/web",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@codemirror/commands": "6.11.0",
         "@codemirror/language": "6.12.4",
@@ -67,7 +67,7 @@
     },
     "packages/align": {
       "name": "@musicbutler/align",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "bin": {
         "musicbutler-align": "./src/cli.ts",
       },
@@ -79,11 +79,11 @@
     },
     "packages/lrc": {
       "name": "@musicbutler/lrc",
-      "version": "0.0.1",
+      "version": "0.0.2",
     },
     "packages/shared": {
       "name": "@musicbutler/shared",
-      "version": "0.0.1",
+      "version": "0.0.2",
     },
   },
   "trustedDependencies": [
