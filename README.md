@@ -1,9 +1,10 @@
 # musicbutler
 
 A self-hosted web tool that maintains a [Navidrome](https://www.navidrome.org/)
-music library. v1 ships one tool, **Lyrics Sync**: browse the library, write or
-edit the `.lrc` file of a song, generate word-level timestamps by aligning the
-lyrics against the audio, and check the result by listening.
+music library. v1 ships one tool, **Lyrics Sync**: browse the library, import or
+write the words of a song, generate word-level timestamps by aligning those
+words against the audio, and check the result by listening. A second screen,
+**Sync queue**, shows the jobs that run and the jobs that wait.
 
 The whole app is one container image: server, web UI, `ffmpeg` and the ML
 models. It pulls without a login and works offline after the first pull.
@@ -115,6 +116,46 @@ override the model id or point at a local export directory.
 
 A 4-minute song takes about 70 s on an Apple M-series CPU. Numbers in the
 lyrics cannot be aligned (the models have no digits): write them out as words.
+
+The alignment runs on a worker thread, so the app stays usable while a job
+runs. You can edit a different song, start more jobs or move around the library.
+A job blocks only the song it aligns.
+
+## The sync queue
+
+Start a sync and the job joins a queue. The server runs one job at a time,
+because the models take all of the processor. The **Sync queue** screen lists
+the job that runs, the jobs that wait and the jobs that finished. Each row shows
+the stage, the percentage and the run time. You can cancel a job that runs and a
+job that still waits. The sidebar shows a count while jobs are active.
+
+Two jobs on one song are refused. They would write the same `.lrc` file at the
+same time.
+
+## Import lyrics
+
+Select **Import lyrics** to get the words from an outside source. The app asks
+three sources at once.
+
+| Source | Access | Timestamps |
+| --- | --- | --- |
+| [LRCLIB](https://lrclib.net/docs) | Open API. No key. | Yes |
+| [Genius](https://genius.com) | The app reads the song page. | No |
+| [AZLyrics](https://www.azlyrics.com) | The app reads the song page. | No |
+
+LRCLIB comes first, because it is the only source with an API and the only one
+that holds timestamps. A result marked **Timed** goes into the editor with its
+timestamps, so you can skip the sync step. The other two sources hold words
+only, so those results still need a sync.
+
+Genius and AZLyrics have no lyrics API. The app reads their pages instead, so
+those two stop working whenever the site changes. A source that fails is
+reported next to the results that did arrive. AZLyrics blocks automated readers
+and often refuses a server, so expect it to fail more than the others.
+
+An import goes into the editor and not to disk. Save it yourself. The search
+fields come from the file path, because the server reads no tags from the audio
+file. Correct them when the guess is wrong, then search again.
 
 ## Configuration
 
