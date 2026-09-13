@@ -1,9 +1,13 @@
 import { Box, Button, Code, Flex, Group, Paper, Stack, Text } from "@mantine/core";
 import { shiftTimestamps } from "@musicbutler/lrc";
 import type { Lang } from "@musicbutler/shared";
-import { IconDeviceFloppy, IconTrash } from "@tabler/icons-react";
+import { IconDeviceFloppy, IconDownload, IconTrash } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
+import {
+	type ImportedLyrics,
+	ImportLyricsModal,
+} from "@/features/lyrics-import/components/ImportLyricsModal";
 import { AudioPlayer } from "@/features/lyrics-sync/components/AudioPlayer";
 import { ColumnResizer } from "@/features/lyrics-sync/components/ColumnResizer";
 import { ConfirmDialog } from "@/features/lyrics-sync/components/ConfirmDialog";
@@ -64,6 +68,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 	const [treeWidth, setTreeWidth] = useState(320);
 	const [duration, setDuration] = useState<number | undefined>(undefined);
 	const [lang, setLang] = useState<Lang | null>(null);
+	const [importOpen, setImportOpen] = useState(false);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 	const editorRef = useRef<LrcEditorHandle | null>(null);
 
@@ -169,6 +174,19 @@ export const LyricsSyncPage: FunctionComponent = () => {
 		});
 	};
 
+	/** Puts imported words in the editor. The user still has to save them. */
+	const onImport = ({ text, synced, source }: ImportedLyrics) => {
+		if (!song) return;
+		// One transaction, so a wrong import is one undo away.
+		editorRef.current?.replaceText(text);
+		setBuffer(song, text);
+		notify.success(
+			synced
+				? `The app read timed lyrics from ${source}. Check the timing, then save.`
+				: `The app read the lyrics from ${source}. Select Sync lyrics to time them.`,
+		);
+	};
+
 	const applyOffset = (offset: number) => {
 		if (!song) return;
 		const next = shiftTimestamps(editorText, offset);
@@ -254,6 +272,14 @@ export const LyricsSyncPage: FunctionComponent = () => {
 								Save
 							</Button>
 							<LanguageSelect value={lang} onChange={setLang} isDisabled={sync.isRunning} />
+							<Button
+								variant="default"
+								leftSection={<IconDownload size={18} />}
+								disabled={sync.isRunning}
+								onClick={() => setImportOpen(true)}
+							>
+								Import lyrics
+							</Button>
 							<SyncButton
 								editorText={editorText}
 								jobRunning={sync.isRunning}
@@ -280,6 +306,16 @@ export const LyricsSyncPage: FunctionComponent = () => {
 					</Stack>
 				)}
 			</Flex>
+
+			{song !== null && (
+				<ImportLyricsModal
+					isOpen={importOpen}
+					onClose={() => setImportOpen(false)}
+					audioPath={song}
+					durationSec={duration}
+					onImport={onImport}
+				/>
+			)}
 
 			<SyncConfirmDialog
 				isOpen={confirmSyncOpen}

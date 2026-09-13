@@ -113,6 +113,48 @@ export type Entry =
 			hasLrc: boolean;
 	  };
 
+/** Sources the app can import lyrics from. */
+export const LYRICS_PROVIDERS = ["lrclib", "genius", "azlyrics"] as const;
+export type LyricsProvider = (typeof LYRICS_PROVIDERS)[number];
+
+export const LYRICS_PROVIDER_LABELS: Record<LyricsProvider, string> = {
+	lrclib: "LRCLIB",
+	genius: "Genius",
+	azlyrics: "AZLyrics",
+};
+
+/**
+ * One result of a lyrics search. It holds no words: a search returns many rows
+ * and most are never used, so the text comes from a second call for the one row
+ * the user picks.
+ */
+export type LyricsCandidate = {
+	provider: LyricsProvider;
+	/** Identifier inside the provider. Give it back to `lyrics.fetch`. */
+	id: string;
+	title: string;
+	artist: string;
+	album?: string;
+	durationSec?: number;
+	/** True when the provider holds timestamps, so the sync step can be skipped. */
+	synced: boolean;
+	/** Page a person can open. Genius always has one. */
+	url?: string;
+};
+
+/** The words of one candidate. */
+export type LyricsFetchResult = {
+	provider: LyricsProvider;
+	id: string;
+	/** Lyrics with no timestamps, one line per line. */
+	plain: string;
+	/** LRC text with timestamps, when the provider has it. */
+	synced: string | null;
+};
+
+/** Rows one search returns, per provider. More than this is noise. */
+export const LYRICS_SEARCH_LIMIT = 12;
+
 /** Languages the alignment engine knows about (docs/PLAN.md §13.13). */
 export const LANGS = ["en-US", "it-IT"] as const;
 export type Lang = (typeof LANGS)[number];
