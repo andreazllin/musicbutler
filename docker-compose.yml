@@ -7,6 +7,10 @@ services:
     image: ghcr.io/andreazllin/musicbutler:latest   # pin a version for stability, e.g. :0.0.1
     environment:
       MUSIC_DIR: /music
+      # Languages to run, comma separated. English is baked into the image.
+      # Any other language downloads once on the first start, into the models
+      # volume below. Supported: en-US, it-IT
+      MUSICBUTLER_LANGS: "${MUSICBUTLER_LANGS:-en-US}"
       PORT: "3000"
       # PUID/PGID: must match the owner of your music library
       PUID: "${PUID:-1000}"
@@ -14,6 +18,8 @@ services:
     volumes:
       # read-write on purpose: this is where .lrc files are written
       - ${NAVIDROME_MUSIC_DIR:?set NAVIDROME_MUSIC_DIR in .env}:/music
+      # keeps a downloaded language across restarts and upgrades
+      - musicbutler-models:/models
     ports:
       - "127.0.0.1:3000:3000"   # never 0.0.0.0 without the auth proxy below
     restart: unless-stopped
@@ -22,6 +28,9 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  musicbutler-models:
 
 # Uncomment to expose musicbutler beyond localhost behind HTTP basic auth.
 # Generate the hash with: docker run --rm caddy:2-alpine caddy hash-password

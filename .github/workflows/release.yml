@@ -47,8 +47,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push by digest (English)
-        id: en
+      # One image for every language: English is baked in, and the entrypoint
+      # downloads anything else MUSICBUTLER_LANGS names (docs/PLAN.md §13.16).
+      - name: Build and push by digest
+        id: image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -56,22 +58,11 @@ jobs:
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=en-${{ steps.arch.outputs.name }}
           cache-to: type=gha,mode=max,scope=en-${{ steps.arch.outputs.name }}
-      - name: Build and push by digest (multilang, docs/PLAN.md §13.16)
-        id: multi
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          build-args: WITH_IT_MODEL=1
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=en-${{ steps.arch.outputs.name }}
-          cache-to: type=gha,mode=max,scope=multi-${{ steps.arch.outputs.name }}
       - name: Export digests
         run: |
-          mkdir -p /tmp/digests/en /tmp/digests/multi
+          mkdir -p /tmp/digests
           # Artifact file names may not contain ":", so the `sha256:` prefix is dropped here and re-added in `merge`.
-          en="${{ steps.en.outputs.digest }}"; touch "/tmp/digests/en/${en#sha256:}"
-          multi="${{ steps.multi.outputs.digest }}"; touch "/tmp/digests/multi/${multi#sha256:}"
+          digest="${{ steps.image.outputs.digest }}"; touch "/tmp/digests/${digest#sha256:}"
       - uses: actions/upload-artifact@v4
         with:
           name: digests-${{ steps.arch.outputs.name }}
@@ -107,18 +98,10 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
-      - name: Create the English manifest list
-        working-directory: /tmp/digests/en
+      - name: Create the manifest list
+        working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.IMAGE }}@sha256:%s ' *)
-      - name: Create the multilang manifest list
-        working-directory: /tmp/digests/multi
-        run: |
-          TAGS="-t ${{ env.IMAGE }}:latest-multilang"
-          case "${GITHUB_REF}" in refs/tags/v*) TAGS="$TAGS -t ${{ env.IMAGE }}:${GITHUB_REF#refs/tags/v}-multilang";; esac
-          docker buildx imagetools create $TAGS $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect
-        run: |
-          docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
-          docker buildx imagetools inspect ${{ env.IMAGE }}:latest-multilang
+        run: docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}

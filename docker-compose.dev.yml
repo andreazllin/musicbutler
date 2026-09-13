@@ -5,11 +5,12 @@ services:
   musicbutler:
     build:
       context: .
-      args:
-        WITH_IT_MODEL: "${WITH_IT_MODEL:-0}"
     environment:
       MUSIC_DIR: /music
       MODEL_CACHE_DIR: /models
+      # Languages to run. English is baked into the image; anything else here is
+      # downloaded on the first start.
+      MUSICBUTLER_LANGS: "${MUSICBUTLER_LANGS:-en-US}"
       PORT: "3000"
       LOG_LEVEL: debug
       PUID: "${PUID:-1000}"
@@ -18,6 +19,7 @@ services:
       - ${DEV_MUSIC_DIR:-./fixtures/library}:/music
       - ./apps/server/src:/app/apps/server/src:ro
       - ./packages:/app/packages:ro
+      - musicbutler-models-dev:/models
     ports:
       - "127.0.0.1:3000:3000"
     command: ["bun", "--watch", "apps/server/src/index.ts"]
@@ -26,3 +28,6 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+volumes:
+  musicbutler-models-dev:

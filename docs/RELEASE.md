@@ -10,7 +10,7 @@ one-time steps that make the image pullable without a login.
    `${{ github.repository_owner }}`, so the image name follows the owner
    automatically: `ghcr.io/andreazllin/musicbutler`.
 2. **Let the first workflow run.** A push to `main` builds and pushes
-   `ghcr.io/andreazllin/musicbutler:latest` (and `:latest-multilang`, `:sha-…`).
+   `ghcr.io/andreazllin/musicbutler:latest` (and `:sha-…`).
 3. **Flip the package to Public.** GHCR makes a package *private* on its first
    push, and a private package returns `401` to everyone else. Go to
    `https://github.com/andreazllin?tab=packages` → `musicbutler` → *Package
@@ -62,9 +62,9 @@ one-time steps that make the image pullable without a login.
 amd64, `ubuntu-24.04-arm` for arm64), pushes both by digest, and joins them
 into one manifest list per tag in the `merge` job. No QEMU is involved: the
 first full build took about 8 minutes per architecture, and cached rebuilds
-about 3. Two manifest lists are published per run: the English image
-(`latest`, semver tags, `sha-…`) and `latest-multilang` (English + Italian,
-`<version>-multilang` on a tag).
+about 3. One manifest list is published per run (`latest`, semver tags,
+`sha-…`). There is no separate multilang image: English is baked in, and
+`MUSICBUTLER_LANGS` tells the entrypoint to download the rest.
 
 Verified on 2026-09-10 (first release from `main`): `docker buildx imagetools
 inspect ghcr.io/andreazllin/musicbutler:latest` lists `linux/amd64` and

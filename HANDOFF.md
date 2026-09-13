@@ -19,7 +19,7 @@ State of the musicbutler build for whoever resumes (human or agent). Plan:
 
 ## Not verified / needs the user
 - Published 2026-09-10: repo <https://github.com/andreazllin/musicbutler> (public),
-  images `ghcr.io/andreazllin/musicbutler:{latest,latest-multilang,sha-…}`, both
+  images `ghcr.io/andreazllin/musicbutler:{latest,sha-…}`, both
   `linux/amd64` and `linux/arm64`, built on native runners (no QEMU). The
   quickstart in README works anonymously after `docker logout ghcr.io`.
 - ASR models (user decision 2026-09-10): en-US `facebook/wav2vec2-large-960h-lv60-self`,

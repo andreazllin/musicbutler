@@ -4,6 +4,10 @@
  *
  *   bun run scripts/fetch-models.ts [--lang en-US,it-IT] [--dir <MODEL_CACHE_DIR>]
  *
+ * A language that is already present is skipped, so this is safe to run on
+ * every container start. Exit 2 means the language list is wrong. Exit 1 means
+ * a download failed.
+ *
  * `--dir` sets MUSICBUTLER_CACHE before the engine is imported, so both the
  * Demucs weights and the Transformers.js cache land under that directory
  * (docs/PLAN.md §13.14). Exits non-zero on any failure. `it-IT` is skipped
@@ -31,7 +35,9 @@ const requested = (values.lang ?? LANGS.join(",")).split(",").map((s) => s.trim(
 for (const l of requested) {
 	if (!(LANGS as readonly string[]).includes(l)) {
 		console.error(`unknown language ${l}; use ${LANGS.join(", ")}`);
-		process.exit(1);
+		// Exit 2 marks a bad request, which the container entrypoint treats as
+		// fatal. Exit 1 is a download that failed, which it only warns about.
+		process.exit(2);
 	}
 }
 const langs = requested as Lang[];

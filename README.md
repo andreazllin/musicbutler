@@ -29,11 +29,13 @@ services:
     image: ghcr.io/andreazllin/musicbutler:latest   # pin a version for stability, e.g. :0.0.1
     environment:
       MUSIC_DIR: /music
+      MUSICBUTLER_LANGS: "${MUSICBUTLER_LANGS:-en-US}"   # en-US, it-IT
       PORT: "3000"
       PUID: "${PUID:-1000}"   # must match the owner of your music library
       PGID: "${PGID:-1000}"
     volumes:
       - ${NAVIDROME_MUSIC_DIR:?set NAVIDROME_MUSIC_DIR in .env}:/music   # read-write on purpose
+      - musicbutler-models:/models   # keeps a downloaded language
     ports:
       - "127.0.0.1:3000:3000"   # never 0.0.0.0 without the auth proxy
     restart: unless-stopped
@@ -42,6 +44,9 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  musicbutler-models:
 ```
 
 Upgrade with:
@@ -66,23 +71,33 @@ docker compose pull && docker compose up -d
   which adds HTTP basic auth in front of the container. Never publish port 3000
   on `0.0.0.0` without it.
 
-## Image size and languages
+## Languages
 
-The image is large (about **1.7 GB** with the English model) and the first pull
-is slow. The size is the bundled ML models: Demucs for vocal isolation (166 MB)
-and a wav2vec2 acoustic model per language. In exchange the container works at
-once, offline, with no runtime download, and `/healthz` reports
-`modelsReady: true` right after `docker compose up`.
+Set `MUSICBUTLER_LANGS` to the languages you want, comma separated:
 
-| Language | Acoustic model (ONNX, int8) | Source model | Size |
+```bash
+echo 'MUSICBUTLER_LANGS=en-US,it-IT' >> .env
+docker compose up -d
+```
+
+There is one image for every language. English is baked into it, so the
+container works offline as soon as it starts. Any other language downloads once
+on the first start, into the `musicbutler-models` volume, and stays there across
+restarts and upgrades.
+
+| Language | Acoustic model (ONNX, int8) | Source model | Download |
 | --- | --- | --- | --- |
-| `en-US` English | `linandrea/wav2vec2-large-960h-lv60-self-onnx` | `facebook/wav2vec2-large-960h-lv60-self` | 339 MB |
+| `en-US` English | `linandrea/wav2vec2-large-960h-lv60-self-onnx` | `facebook/wav2vec2-large-960h-lv60-self` | baked in |
 | `it-IT` Italian | `linandrea/wav2vec2-large-xlsr-53-italian-onnx` | `jonatasgrosman/wav2vec2-large-xlsr-53-italian` | 355 MB |
 
-| Tag | Languages | Approximate size |
-| --- | --- | --- |
-| `latest`, `1.x` | English | ~1.7 GB |
-| `latest-multilang` | English + Italian | ~2.1 GB |
+The image is about **1.7 GB** and the first pull is slow. Most of that is the ML
+models: Demucs for vocal isolation (166 MB) and the English acoustic model
+(339 MB). In exchange English needs no download, and `/healthz` reports
+`modelsReady: true` right after `docker compose up`.
+
+A language that fails to download does not stop the container. The server starts
+with the models it holds, and the app marks the rest as not installed. The
+entrypoint tries again on the next start.
 
 The ONNX exports are produced once with `packages/align/scripts/export-asr-onnx.py`
 (see `packages/align/README.md`). `MUSICBUTLER_ASR_EN` and `MUSICBUTLER_ASR_IT`
@@ -106,15 +121,16 @@ lyrics cannot be aligned (the models have no digits): write them out as words.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `MUSIC_DIR` | `/music` | The library root inside the container. Required. |
-| `MODEL_CACHE_DIR` | `/models` | Where the models live. The image ships them here; override to mount your own. |
+| `MUSICBUTLER_LANGS` | `en-US` | Languages to run, comma separated. Anything past English downloads on the first start. |
+| `MODEL_CACHE_DIR` | `/models` | Where the models live. The image ships English here. Mount a volume to keep a download. |
 | `PORT` | `3000` | HTTP port. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. |
 | `FFMPEG_PATH` | `ffmpeg` | Path to the ffmpeg binary. |
 | `PUID` / `PGID` | `1000` | uid/gid the server runs as, so written files belong to the library owner. |
 | `MUSICBUTLER_ASR_EN` / `MUSICBUTLER_ASR_IT` | the `linandrea/…-onnx` ids | ASR model id or absolute path of an exported directory; empty disables the language. |
 
-`.env.example` lists the only values the compose file needs:
-`NAVIDROME_MUSIC_DIR`, `PUID`, `PGID`.
+`.env.example` lists the values the compose file reads:
+`NAVIDROME_MUSIC_DIR`, `PUID`, `PGID` and `MUSICBUTLER_LANGS`.
 
 ## Development
 

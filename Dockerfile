@@ -1,9 +1,13 @@
 # syntax=docker/dockerfile:1.7
-# musicbutler: one image with the server, the built web app, ffmpeg and the ML
-# models baked in (docs/PLAN.md §9.2). Multi-arch: linux/amd64 and linux/arm64.
+# musicbutler: one image with the server, the built web app, ffmpeg and the
+# English models baked in (docs/PLAN.md §9.2). Multi-arch: linux/amd64 and
+# linux/arm64.
+#
+# There is one image for every language. English is baked, so the container
+# works offline as soon as it starts. MUSICBUTLER_LANGS names the languages to
+# run; the entrypoint downloads any that are missing into the /models volume on
+# the first start (docs/PLAN.md §13.16).
 ARG BUN_VERSION=1.3.14
-# Set to 1 to also bake the Italian ASR model (docs/PLAN.md §13.16).
-ARG WITH_IT_MODEL=0
 
 # ---------------------------------------------------------------------------
 # 1. deps: install every workspace dependency once (cached on lockfile changes).
@@ -28,12 +32,10 @@ RUN bun install --frozen-lockfile \
 #    change does not invalidate it, so the layer stays cached and is not pushed again.
 # ---------------------------------------------------------------------------
 FROM deps AS models
-ARG WITH_IT_MODEL
 COPY packages/shared packages/shared
 COPY packages/align packages/align
 COPY scripts/fetch-models.ts scripts/fetch-models.ts
-RUN if [ "$WITH_IT_MODEL" = "1" ]; then LANGS="en-US,it-IT"; else LANGS="en-US"; fi \
- && bun run scripts/fetch-models.ts --dir /models --lang "$LANGS"
+RUN bun run scripts/fetch-models.ts --dir /models --lang en-US
 
 # ---------------------------------------------------------------------------
 # 3. build: build the web app and prune to the production dependencies.
@@ -70,9 +72,13 @@ COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY --from=build /app/apps/web/package.json ./apps/web/package.json
 COPY --from=build /app/packages ./packages
 COPY --from=models /models /models
+# The entrypoint runs this to add any language that is not baked in.
+COPY --from=build /app/scripts/fetch-models.ts ./scripts/fetch-models.ts
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p /app/.cache /music && chown -R app:app /app/.cache /music
-VOLUME ["/music"]
+# Naming a volume for /models keeps a downloaded language across an upgrade.
+# Docker seeds a new named volume from the baked English models.
+VOLUME ["/music", "/models"]
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:3000/healthz || exit 1
 ENTRYPOINT ["/entrypoint.sh"]
