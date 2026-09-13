@@ -173,7 +173,7 @@ two tables differ, the frontend document wins for frontend concerns.
 | Routing | TanStack Router | Per the frontend document |
 | Server state | TanStack Query, through `@trpc/tanstack-react-query` | |
 | Client state | Zustand | One store per feature. Keep it small |
-| URL state | nuqs | The selected song path lives in the URL. See §13.6 |
+| URL state | nuqs | The selected song path lives in the URL, base64url-encoded. See §13.6 |
 | Components | **Mantine**, <https://mantine.dev> | An npm dependency, not vendored source. Its own CSS variables and color scheme. See §4.1 |
 | Icons | `@tabler/icons-react` | The set Mantine documents. Do not add a second icon set |
 | HTTP client | axios | See §4.2 |
@@ -449,7 +449,8 @@ the app reuses the basic-auth session of the browser.
 - **TanStack Query owns every value that came from the server.** That covers
   directory listings, the saved `.lrc` content, its mtime, and the job state.
 - **The URL owns the shareable view state.** That is the selected audio path,
-  through nuqs. A user can then link to a song. See §13.6.
+  through nuqs, base64url-encoded so the query string does not show the folder
+  layout of the library. A user can still link to a song. See §13.6.
 - **Zustand owns the remaining UI state.** That covers the expanded tree nodes
   and the unsaved editor buffer. It also covers the dirty flag, the playback
   offset, the color scheme, and the open state of each dialog.
@@ -983,7 +984,7 @@ this table decides. Apply each resolution. Record any change of mind in
 | 13.3 | Lint and format | This plan allowed ESLint or Biome. The frontend document names Biome | Use Biome. The filesystem import guard in §5.3 becomes the Biome rule `noRestrictedImports` instead of the ESLint rule |
 | 13.4 | Folder layout | This plan used `src/tools/<tool>/`. The frontend document uses `src/features/<domain>/` with separate `pages/`, `router/`, and `layouts/` folders | Follow the frontend document. Read "tool" as "feature". Keep the registry in `src/features/registry.ts`, because the sidebar needs it |
 | 13.5 | Component library | The frontend document says "vendored shadcn primitives" under `components/ui/` | Use Mantine from npm. Nothing is vendored, so `components/` holds app layout only |
-| 13.6 | URL state | This plan held the selected song in Zustand. The frontend document puts shareable view state in the URL through nuqs | Put the selected audio path in the URL. A user can then link to a song and reload into it |
+| 13.6 | URL state | This plan held the selected song in Zustand. The frontend document puts shareable view state in the URL through nuqs | Put the selected audio path in the URL, base64url-encoded through a custom nuqs parser. A user can then link to a song and reload into it |
 | 13.7 | Forms | The frontend document specifies react-hook-form and zod | Keep both available. v1 has almost no forms, so do not force them into the editor screen |
 | 13.8 | LRC granularity | The engine writes word level tags by default. §12.4 of this plan defaulted to line level | Word level is the default. `packages/lrc` must round-trip both forms. The editor mode already has an `lrc-word-time` token |
 | 13.9 | ASR window length | This plan said about 30 s. The engine document says 15 s, and it includes the final partial window | Use 15 s, per the engine document. It is specific and verified |
