@@ -5,7 +5,6 @@ import type { FunctionComponent } from "react";
 
 type Props = {
 	editorText: string;
-	songSelected: boolean;
 	jobRunning: boolean;
 	/** `needsConfirm` is true when the text already has timestamps (docs/PLAN.md §7.5). */
 	onRequestSync: (needsConfirm: boolean) => void;
@@ -16,14 +15,12 @@ type Props = {
 /** The "Sync lyrics" button state machine (docs/PLAN.md §7.5, DECIDED). */
 export const SyncButton: FunctionComponent<Props> = ({
 	editorText,
-	songSelected,
 	jobRunning,
 	onRequestSync,
 	onCancel,
 	isCancelling,
 }) => {
-	const empty = editorText.trim().length === 0;
-	const reason = empty ? "Write the lyrics first" : !songSelected ? "Select a song" : null;
+	const reason = editorText.trim().length === 0 ? "Write the lyrics first" : null;
 
 	if (jobRunning) {
 		return (

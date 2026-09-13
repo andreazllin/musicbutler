@@ -1,4 +1,4 @@
-import { Badge, Box, Group, Text } from "@mantine/core";
+import { Badge, Box, CloseButton, Group, Text, Tooltip } from "@mantine/core";
 import { lrcPathFor } from "@musicbutler/shared";
 import type { FunctionComponent } from "react";
 import { baseNameOf } from "../helpers/paths";
@@ -7,10 +7,12 @@ type Props = {
 	songPath: string | null;
 	dirty: boolean;
 	lrcExists: boolean | undefined;
+	/** Clears the selection. The caller applies the unsaved-changes guard. */
+	onClear: () => void;
 };
 
 /** Song file name, the resolved `.lrc` path and the dirty indicator (docs/PLAN.md §7.3). */
-export const EditorHeader: FunctionComponent<Props> = ({ songPath, dirty, lrcExists }) => (
+export const EditorHeader: FunctionComponent<Props> = ({ songPath, dirty, lrcExists, onClear }) => (
 	<Group
 		component="header"
 		mih={48}
@@ -47,6 +49,9 @@ export const EditorHeader: FunctionComponent<Props> = ({ songPath, dirty, lrcExi
 						No .lrc file
 					</Badge>
 				)}
+				<Tooltip label="Close this song" position="left" withArrow>
+					<CloseButton aria-label="Close this song" onClick={onClear} />
+				</Tooltip>
 			</>
 		)}
 	</Group>

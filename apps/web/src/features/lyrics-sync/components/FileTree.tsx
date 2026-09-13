@@ -14,7 +14,7 @@ import {
 	type TreeNodeData,
 	useTree,
 } from "@mantine/core";
-import type { Entry } from "@musicbutler/shared";
+import { type Entry, isAudioFile } from "@musicbutler/shared";
 import {
 	IconAlertTriangle,
 	IconChevronRight,
@@ -108,8 +108,12 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 	const onSelect = useCallback(
 		(values: string[]) => {
 			const value = values.at(-1);
-			// Directories expand on click; only audio rows change the selection.
-			if (value !== undefined && !dirPaths.current.has(value)) onSelectAudio(value);
+			// Directories expand on click; only audio rows change the selection. The
+			// extension is checked too, so a directory the ref has not seen yet can
+			// never reach `lrc.get`, which rejects anything that is not an audio file.
+			if (value !== undefined && !dirPaths.current.has(value) && isAudioFile(value)) {
+				onSelectAudio(value);
+			}
 		},
 		[onSelectAudio],
 	);

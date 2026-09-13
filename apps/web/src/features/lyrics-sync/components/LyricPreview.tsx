@@ -26,7 +26,6 @@ type Props = {
 	audioRef: RefObject<HTMLAudioElement | null>;
 	/** Shifts every timestamp in the editor by the current preview offset. */
 	onApplyOffset: (offsetSeconds: number) => void;
-	disabled?: boolean;
 };
 
 /**
@@ -35,12 +34,7 @@ type Props = {
  * from a binary search. Clicking a line seeks. Auto-scroll keeps the active line
  * centered and pauses for 3 s after a manual scroll.
  */
-export const LyricPreview: FunctionComponent<Props> = ({
-	text,
-	audioRef,
-	onApplyOffset,
-	disabled,
-}) => {
+export const LyricPreview: FunctionComponent<Props> = ({ text, audioRef, onApplyOffset }) => {
 	const offset = useLyricsSyncStore((s) => s.previewOffset);
 	const setOffset = useLyricsSyncStore((s) => s.setPreviewOffset);
 	const lines = useMemo(() => {
@@ -95,9 +89,7 @@ export const LyricPreview: FunctionComponent<Props> = ({
 			<ol ref={listRef} onScroll={onScroll} aria-label="Lyric preview" className={classes.list}>
 				{lines.length === 0 ? (
 					<Box component="li" py="lg" ta="center" fz="sm" c="dimmed">
-						{disabled
-							? "Select a song to preview its lyrics."
-							: "No timed lines yet. Write lyrics with [mm:ss.xx] tags, or run Sync lyrics."}
+						No timed lines yet. Write lyrics with [mm:ss.xx] tags, or run Sync lyrics.
 					</Box>
 				) : (
 					lines.map((line, i) => (
@@ -141,7 +133,6 @@ export const LyricPreview: FunctionComponent<Props> = ({
 						onChange={(v) => {
 							if (Number.isFinite(v)) setOffset(v);
 						}}
-						disabled={disabled}
 						size="sm"
 					/>
 				</Box>
@@ -152,7 +143,7 @@ export const LyricPreview: FunctionComponent<Props> = ({
 				<Button
 					size="xs"
 					variant="default"
-					disabled={disabled || offset === 0}
+					disabled={offset === 0}
 					onClick={() => {
 						onApplyOffset(offset);
 						setOffset(0);

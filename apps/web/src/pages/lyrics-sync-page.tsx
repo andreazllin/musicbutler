@@ -12,6 +12,7 @@ import { FileTree, SurfaceError } from "@/features/lyrics-sync/components/FileTr
 import { LanguageSelect } from "@/features/lyrics-sync/components/LanguageSelect";
 import { LrcEditor, type LrcEditorHandle } from "@/features/lyrics-sync/components/LrcEditor";
 import { LyricPreview } from "@/features/lyrics-sync/components/LyricPreview";
+import { NoSongSelected } from "@/features/lyrics-sync/components/NoSongSelected";
 import { SyncButton } from "@/features/lyrics-sync/components/SyncButton";
 import { SyncConfirmDialog } from "@/features/lyrics-sync/components/SyncConfirmDialog";
 import { SyncProgress } from "@/features/lyrics-sync/components/SyncProgress";
@@ -113,7 +114,8 @@ export const LyricsSyncPage: FunctionComponent = () => {
 		setPreviewOffset(0);
 		void setSong(path);
 	};
-	const requestSelect = (path: string) => {
+	/** Applies the unsaved-changes guard. `null` clears the selection. */
+	const requestSelect = (path: string | null) => {
 		if (path === song) return;
 		if (dirty) setPendingSwitch({ toPath: path });
 		else selectSong(path);
@@ -193,85 +195,87 @@ export const LyricsSyncPage: FunctionComponent = () => {
 			/>
 
 			<Flex component="section" direction="column" flex={1} miw={0}>
-				<EditorHeader songPath={song} dirty={dirty} lrcExists={lrc.data?.exists} />
+				<EditorHeader
+					songPath={song}
+					dirty={dirty}
+					lrcExists={lrc.data?.exists}
+					onClear={() => requestSelect(null)}
+				/>
 
-				<Stack gap="sm" flex={1} mih={0} p="md">
-					{song !== null && lrc.isError ? (
-						<SurfaceError
-							title="The lyrics file could not be read"
-							detail={lrc.error.message}
-							onRetry={() => void lrc.refetch()}
-						/>
-					) : (
-						<LrcEditor
-							handleRef={editorRef}
-							value={editorText}
-							onChange={(text) => {
-								if (song) setBuffer(song, text);
-							}}
-							disabled={!songSelected || (song !== null && lrc.isPending) || sync.isRunning}
-							durationSeconds={duration}
-							placeholder={
-								songSelected
-									? "Paste or type the lyrics here, then press Sync lyrics to generate timestamps."
-									: "Select a song to start."
-							}
-						/>
-					)}
-
-					<Paper withBorder h="38%" mih={224} style={{ overflow: "hidden" }}>
-						<Stack gap={0} h="100%">
-							<Box p={6} style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
-								<AudioPlayer
-									src={song ? mediaStreamUrl(song) : null}
-									audioRef={audioRef}
-									onDurationChange={setDuration}
-								/>
-							</Box>
-							<LyricPreview
-								text={editorText}
-								audioRef={audioRef}
-								onApplyOffset={applyOffset}
-								disabled={!songSelected}
+				{!songSelected ? (
+					<NoSongSelected />
+				) : (
+					<Stack gap="sm" flex={1} mih={0} p="md">
+						{lrc.isError ? (
+							<SurfaceError
+								title="The lyrics file could not be read"
+								detail={lrc.error.message}
+								onRetry={() => void lrc.refetch()}
 							/>
-						</Stack>
-					</Paper>
+						) : (
+							<LrcEditor
+								handleRef={editorRef}
+								value={editorText}
+								onChange={(text) => {
+									if (song) setBuffer(song, text);
+								}}
+								disabled={lrc.isPending || sync.isRunning}
+								durationSeconds={duration}
+								placeholder="Paste or type the lyrics here, then press Sync lyrics to generate timestamps."
+							/>
+						)}
 
-					{sync.progress && <SyncProgress progress={sync.progress} />}
+						<Paper withBorder h="38%" mih={224} style={{ overflow: "hidden" }}>
+							<Stack gap={0} h="100%">
+								<Box
+									p={6}
+									style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
+								>
+									<AudioPlayer
+										src={mediaStreamUrl(song)}
+										audioRef={audioRef}
+										onDurationChange={setDuration}
+									/>
+								</Box>
+								<LyricPreview text={editorText} audioRef={audioRef} onApplyOffset={applyOffset} />
+							</Stack>
+						</Paper>
 
-					<Group gap="md" wrap="wrap">
-						<Button
-							leftSection={<IconDeviceFloppy size={18} />}
-							disabled={!songSelected || !dirty || sync.isRunning}
-							loading={save.isPending}
-							onClick={onSave}
-						>
-							Save
-						</Button>
-						<LanguageSelect value={lang} onChange={setLang} isDisabled={sync.isRunning} />
-						<SyncButton
-							editorText={editorText}
-							songSelected={songSelected}
-							jobRunning={sync.isRunning}
-							onRequestSync={(needsConfirm) => {
-								if (needsConfirm) setConfirmSyncOpen(true);
-								else startSync();
-							}}
-							onCancel={sync.cancel}
-							isCancelling={sync.isCancelling}
-						/>
-						<Button
-							ml="auto"
-							variant="default"
-							color="red"
-							leftSection={<IconTrash size={18} />}
-							disabled={!songSelected || sync.isRunning || (!lrc.data?.exists && !dirty)}
-							onClick={() => setDeleteOpen(true)}
-						>
-							Delete lyrics
-						</Button>
-					</Group>
-				</Stack>
+						{sync.progress && <SyncProgress progress={sync.progress} />}
+
+						<Group gap="md" wrap="wrap">
+							<Button
+								leftSection={<IconDeviceFloppy size={18} />}
+								disabled={!dirty || sync.isRunning}
+								loading={save.isPending}
+								onClick={onSave}
+							>
+								Save
+							</Button>
+							<LanguageSelect value={lang} onChange={setLang} isDisabled={sync.isRunning} />
+							<SyncButton
+								editorText={editorText}
+								jobRunning={sync.isRunning}
+								onRequestSync={(needsConfirm) => {
+									if (needsConfirm) setConfirmSyncOpen(true);
+									else startSync();
+								}}
+								onCancel={sync.cancel}
+								isCancelling={sync.isCancelling}
+							/>
+							<Button
+								ml="auto"
+								variant="default"
+								color="red"
+								leftSection={<IconTrash size={18} />}
+								disabled={sync.isRunning || (!lrc.data?.exists && !dirty)}
+								onClick={() => setDeleteOpen(true)}
+							>
+								Delete lyrics
+							</Button>
+						</Group>
+					</Stack>
+				)}
 			</Flex>
 
 			<SyncConfirmDialog
@@ -286,7 +290,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 					if (!open) setPendingSwitch(null);
 				}}
 				title="Discard unsaved changes?"
-				confirmLabel="Discard and switch"
+				confirmLabel={pendingSwitch?.toPath === null ? "Discard and close" : "Discard and switch"}
 				confirmColor="red"
 				onConfirm={() => {
 					const to = pendingSwitch?.toPath ?? null;
@@ -295,7 +299,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 				}}
 			>
 				<Text fz="sm">
-					The lyrics for the current song have unsaved edits. Switching songs throws them away.
+					The lyrics for the current song have unsaved edits. Leaving this song throws them away.
 				</Text>
 			</ConfirmDialog>
 
