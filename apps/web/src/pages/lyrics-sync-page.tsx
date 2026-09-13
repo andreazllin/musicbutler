@@ -247,7 +247,10 @@ export const LyricsSyncPage: FunctionComponent = () => {
 							/>
 						)}
 
-						<Paper withBorder h="38%" mih={224} style={{ overflow: "hidden" }}>
+						{/* The card does not clip. The slider labels of the player sit above
+						    their thumbs, and the card's own top edge used to cut them in half.
+						    Only the preview below needs clipping, so only it clips. */}
+						<Paper withBorder h="38%" mih={224}>
 							<Stack gap={0} h="100%">
 								<Box style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
 									<AudioPlayer
@@ -256,7 +259,9 @@ export const LyricsSyncPage: FunctionComponent = () => {
 										onDurationChange={setDuration}
 									/>
 								</Box>
-								<LyricPreview text={editorText} audioRef={audioRef} onApplyOffset={applyOffset} />
+								<Box flex={1} mih={0} style={{ overflow: "hidden", borderRadius: "inherit" }}>
+									<LyricPreview text={editorText} audioRef={audioRef} onApplyOffset={applyOffset} />
+								</Box>
 							</Stack>
 						</Paper>
 
