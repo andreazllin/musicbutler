@@ -1,7 +1,9 @@
 name: Release image
+# A version tag is the only thing that publishes an image. A push to main runs
+# the checks in ci.yml and nothing else, so `latest` always names a release
+# rather than whatever landed on main last.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 permissions:
@@ -111,8 +113,12 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=Self-hosted lyrics sync for a Navidrome library
             org.opencontainers.image.licenses=AGPL-3.0-only
+          # `latest=auto` moves `latest` onto the tag being built, unless it is a
+          # prerelease. It used to be pinned to the default branch, which cannot
+          # happen now that only a tag builds.
+          flavor: |
+            latest=auto
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
