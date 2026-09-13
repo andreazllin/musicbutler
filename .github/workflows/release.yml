@@ -47,6 +47,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # `docker inspect` reads the labels from the image config, so they have to
+      # be baked in per architecture. The manifest list gets the same values as
+      # annotations in `merge`. Workflows cannot share a YAML anchor across
+      # jobs, so the list is written twice on purpose.
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Self-hosted lyrics sync for a Navidrome library
+            org.opencontainers.image.licenses=AGPL-3.0-only
       # One image for every language: English is baked in, and the entrypoint
       # downloads anything else MUSICBUTLER_LANGS names (docs/PLAN.md §13.16).
       - name: Build and push by digest
@@ -55,6 +67,7 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=en-${{ steps.arch.outputs.name }}
           cache-to: type=gha,mode=max,scope=en-${{ steps.arch.outputs.name }}
@@ -87,21 +100,40 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
         uses: docker/metadata-action@v5
+        env:
+          # `imagetools create` writes an index, so the annotations have to be
+          # aimed at the index. The default aims them at the child manifests,
+          # where GHCR does not read them.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
         with:
           images: ${{ env.IMAGE }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=Self-hosted lyrics sync for a Navidrome library
+            org.opencontainers.image.licenses=AGPL-3.0-only
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
+      # The annotations are what connect the package to this repository on GHCR
+      # and what state the licence. They were computed before and never passed,
+      # so the published index carried the base image's metadata instead.
+      # An annotation value holds spaces, so the arguments are built as an array
+      # rather than by splitting a string.
       - name: Create the manifest list
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          args=()
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args+=(-t "$tag")
+          done < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          while IFS= read -r annotation; do
+            [ -n "$annotation" ] && args+=(--annotation "$annotation")
+          done < <(jq -r '.annotations[]? // empty' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          printf 'argument: %s\n' "${args[@]}"
+          docker buildx imagetools create "${args[@]}" \
             $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect
         run: docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
