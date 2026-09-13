@@ -227,10 +227,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 
 						<Paper withBorder h="38%" mih={224} style={{ overflow: "hidden" }}>
 							<Stack gap={0} h="100%">
-								<Box
-									p={6}
-									style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
-								>
+								<Box style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
 									<AudioPlayer
 										src={mediaStreamUrl(song)}
 										audioRef={audioRef}

@@ -22,26 +22,34 @@ export const lrcEditorTheme = EditorView.theme({
 	},
 	"&.cm-focused": { outline: "none" },
 	".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--mantine-primary-color-filled)" },
+	// CodeMirror paints the selection in `.cm-selectionLayer`, at z-index -2, so
+	// it sits behind the line elements. Both of these must therefore let it
+	// through: the active-line background is a translucent mix rather than a
+	// solid color, and the selection itself is strong enough to read against it.
 	"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
-		{ backgroundColor: "var(--mantine-primary-color-light)" },
-	".cm-activeLine": { backgroundColor: "var(--mantine-color-default-hover)" },
+		{ backgroundColor: "color-mix(in srgb, var(--mantine-primary-color-filled) 32%, transparent)" },
+	".cm-activeLine": {
+		backgroundColor: "color-mix(in srgb, var(--mantine-color-text) 6%, transparent)",
+	},
 	".cm-gutters": {
 		backgroundColor: "var(--mantine-color-default)",
 		color: "var(--mantine-color-dimmed)",
 		borderRight: "1px solid var(--mantine-color-default-border)",
 	},
 	".cm-activeLineGutter": {
-		backgroundColor: "var(--mantine-color-default-hover)",
+		backgroundColor: "color-mix(in srgb, var(--mantine-color-text) 6%, transparent)",
 		color: "var(--mantine-color-text)",
 	},
 	".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 12px", minWidth: "40px" },
-	".cm-selectionMatch": { backgroundColor: "var(--mantine-color-yellow-light)" },
+	".cm-selectionMatch": {
+		backgroundColor: "color-mix(in srgb, var(--mantine-color-yellow-filled) 28%, transparent)",
+	},
 	".cm-searchMatch": {
-		backgroundColor: "var(--mantine-color-yellow-light)",
+		backgroundColor: "color-mix(in srgb, var(--mantine-color-yellow-filled) 28%, transparent)",
 		outline: "1px solid var(--mantine-color-default-border)",
 	},
 	".cm-searchMatch.cm-searchMatch-selected": {
-		backgroundColor: "var(--mantine-primary-color-light)",
+		backgroundColor: "color-mix(in srgb, var(--mantine-primary-color-filled) 45%, transparent)",
 	},
 	".cm-panels": {
 		backgroundColor: "var(--mantine-color-default)",

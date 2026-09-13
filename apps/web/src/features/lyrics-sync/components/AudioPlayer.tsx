@@ -1,13 +1,4 @@
-import {
-	ActionIcon,
-	Box,
-	Group,
-	Paper,
-	SegmentedControl,
-	Slider,
-	Text,
-	Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Box, Group, SegmentedControl, Slider, Text, Tooltip } from "@mantine/core";
 import {
 	IconPlayerPauseFilled,
 	IconPlayerPlayFilled,
@@ -139,16 +130,16 @@ export const AudioPlayer: FunctionComponent<Props> = ({ src, audioRef, onDuratio
 	const disabled = src === null;
 
 	return (
-		<Paper
-			withBorder
+		// No border or surface of its own: the player is the header row of the sync
+		// checker card, which already draws both.
+		<Box
 			role="group"
 			aria-label="Audio player"
 			// The group must hold focus for Space, ← and → (docs/PLAN.md §7.6).
 			tabIndex={0}
 			onKeyDown={onKeyDown}
 			px="sm"
-			py={6}
-			bg="var(--mantine-color-default)"
+			py={8}
 		>
 			<Group gap="md" wrap="nowrap">
 				{/* biome-ignore lint/a11y/useMediaCaption: music has no captions; the lyric preview is the transcript */}
@@ -211,6 +202,6 @@ export const AudioPlayer: FunctionComponent<Props> = ({ src, audioRef, onDuratio
 					data={PLAYBACK_RATES.map((rate) => ({ value: String(rate), label: `${rate}x` }))}
 				/>
 			</Group>
-		</Paper>
+		</Box>
 	);
 };
