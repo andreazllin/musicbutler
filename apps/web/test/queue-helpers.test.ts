@@ -9,8 +9,9 @@ import {
 
 function job(over: Partial<JobSummary> & Pick<JobSummary, "id" | "status">): JobSummary {
 	return {
-		audioPath: "Artist/Album/Song.mp3",
-		lang: "en-US",
+		kind: "lyrics-sync",
+		ref: "Artist/Album/Song.mp3",
+		title: "Song.mp3",
 		stage: "queued",
 		pct: 0,
 		createdAt: 0,
@@ -58,14 +59,14 @@ describe("jobs/helpers/queue", () => {
 
 	test("activeJobFor matches the path and ignores finished jobs", () => {
 		const jobs = [
-			job({ id: "done", status: "done", audioPath: "a.mp3" }),
-			job({ id: "live", status: "running", audioPath: "a.mp3" }),
-			job({ id: "other", status: "running", audioPath: "b.mp3" }),
+			job({ id: "done", status: "done", ref: "a.mp3" }),
+			job({ id: "live", status: "running", ref: "a.mp3" }),
+			job({ id: "other", status: "running", ref: "b.mp3" }),
 		];
-		expect(activeJobFor(jobs, "a.mp3")?.id).toBe("live");
-		expect(activeJobFor(jobs, "b.mp3")?.id).toBe("other");
-		expect(activeJobFor(jobs, "c.mp3")).toBeUndefined();
-		expect(activeJobFor(jobs, null)).toBeUndefined();
+		expect(activeJobFor(jobs, "lyrics-sync", "a.mp3")?.id).toBe("live");
+		expect(activeJobFor(jobs, "lyrics-sync", "b.mp3")?.id).toBe("other");
+		expect(activeJobFor(jobs, "lyrics-sync", "c.mp3")).toBeUndefined();
+		expect(activeJobFor(jobs, "lyrics-sync", null)).toBeUndefined();
 	});
 
 	test("a queued job has no elapsed time, because it has not started", () => {

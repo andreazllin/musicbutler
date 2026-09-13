@@ -41,11 +41,11 @@ export function useSyncJob({ song, onDone, onError }: Handlers) {
 	const [progress, setProgress] = useState<SyncProgressState | null>(null);
 
 	// Adopt the job the server already holds for this song.
-	const serverJob = activeJobFor(jobs, song);
+	const serverJob = activeJobFor(jobs, "lyrics-sync", song);
 	useEffect(() => {
 		if (serverJob === undefined) return;
 		setJob((current) =>
-			current?.id === serverJob.id ? current : { id: serverJob.id, audioPath: serverJob.audioPath },
+			current?.id === serverJob.id ? current : { id: serverJob.id, audioPath: serverJob.ref },
 		);
 	}, [serverJob]);
 

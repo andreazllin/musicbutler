@@ -6,7 +6,13 @@
  * one job at a time and is owned by `../jobs/registry.ts`; the engine wiring
  * lives in `../sync/engine.ts`.
  */
-import { isAudioFile, LANGS, MAX_QUEUED_JOBS, type SyncEvent } from "@musicbutler/shared";
+import {
+	isAudioFile,
+	LANG_LABELS,
+	LANGS,
+	MAX_QUEUED_JOBS,
+	type SyncEvent,
+} from "@musicbutler/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { jobs } from "../jobs/registry.ts";
@@ -52,7 +58,7 @@ export const syncRouter = router({
 		.output(syncStartOutput)
 		.mutation(async ({ input }) => {
 			// Two jobs on one song would race to write the same .lrc file.
-			if (jobs.hasActiveJobFor(input.audioPath)) {
+			if (jobs.hasActiveJobFor("lyrics-sync", input.audioPath)) {
 				throw new TRPCError({
 					code: "CONFLICT",
 					message: "This song is already in the queue.",
@@ -71,9 +77,16 @@ export const syncRouter = router({
 					message: `No model is installed for ${input.lang}`,
 				});
 			}
-			// The queue calls the runner once this job reaches the front.
+			// The queue draws what it is told here and knows nothing of syncing.
+			const slash = input.audioPath.lastIndexOf("/");
 			const job = jobs.createJob(
-				{ audioPath: input.audioPath, lang: input.lang, options: input.options },
+				{
+					kind: "lyrics-sync",
+					ref: input.audioPath,
+					title: input.audioPath.slice(slash + 1),
+					subtitle: slash === -1 ? undefined : input.audioPath.slice(0, slash),
+					badges: [LANG_LABELS[input.lang]],
+				},
 				(queued) => runSyncJob(queued, input),
 			);
 			return { jobId: job.id };

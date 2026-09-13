@@ -188,17 +188,39 @@ export function isActiveJob(status: JobStatus): boolean {
 }
 
 /**
- * One row of `jobs.list`. It carries what the queue screen draws and nothing
- * else: the lyric text and the aligned result stay on the `sync.progress`
- * stream, because a job list must not grow with the size of the lyrics.
+ * Kinds of work the queue can hold. Lyrics Sync is the only one today, and the
+ * queue knows nothing about what any of them do: a new kind is a new entry here
+ * plus a renderer in the web job registry.
+ */
+export const JOB_KINDS = ["lyrics-sync"] as const;
+export type JobKind = (typeof JOB_KINDS)[number];
+
+/**
+ * One row of `jobs.list`, in terms the queue screen can draw without knowing
+ * what the job does.
+ *
+ * `title`, `subtitle` and `badges` are what to show. `kind` and `ref` are what
+ * the owning tool needs to recognise its own job and to link back to it, and
+ * `ref` is opaque to everything else. The payload of the work never travels
+ * here: the lyric text and the aligned result stay on `sync.progress`, because
+ * a job list must not grow with the size of what the jobs carry.
  */
 export type JobSummary = {
 	id: string;
-	audioPath: LibraryPath;
-	lang: Lang;
+	kind: JobKind;
+	/** Identifies the subject of the job inside its kind. Opaque to the queue. */
+	ref: string;
+	/** Primary name of the subject, for example the file name of a song. */
+	title: string;
+	/** Where the subject sits, drawn under the title. */
+	subtitle?: string;
+	/** Short facts about the job, for example the language it runs in. */
+	badges?: string[];
 	status: JobStatus;
-	stage: SyncStage;
+	/** Stage id inside the kind. The web side turns it into words. */
+	stage: string;
 	pct: number;
+	/** Detail of the stage, for example a count of finished parts. */
 	message?: string;
 	/** Milliseconds since epoch. */
 	createdAt: number;

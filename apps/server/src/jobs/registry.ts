@@ -1,6 +1,9 @@
 /**
- * In-memory job queue and event emitter for `sync.*` and `jobs.*`
- * (docs/PLAN.md §6.2).
+ * In-memory job queue and event emitter for `jobs.*` (docs/PLAN.md §6.2).
+ *
+ * The queue holds work of any kind. It starts a runner and records what the
+ * runner reports, and it never looks inside the job: everything it shows comes
+ * from the `JobMeta` the caller gave it.
  *
  * A job is created `queued` and joins a FIFO. One job runs at a time: the
  * models hold hundreds of megabytes and saturate the CPU, so a second parallel
@@ -18,14 +21,22 @@
  * coalesces, so a subscriber that reads slower than the 2 s heartbeat sees the
  * newest snapshot rather than a backlog of stale ones.
  */
-import type { JobStatus, JobSummary, Lang, SyncEvent } from "@musicbutler/shared";
+import type { JobKind, JobStatus, JobSummary, SyncEvent } from "@musicbutler/shared";
 
 type ProgressEvent = Extract<SyncEvent, { type: "progress" }>;
 
+/**
+ * What the queue knows about a job. It is all presentation plus `kind` and
+ * `ref`, because the queue runs work it does not understand: the owning tool
+ * describes its job once, here, and the screen draws that description.
+ */
 export interface JobMeta {
-	audioPath: string;
-	lang: Lang;
-	options?: { isolateVocals?: boolean; leadInMs?: number; wordTimestamps?: boolean };
+	kind: JobKind;
+	/** Identifies the subject inside the kind. Two active jobs may not share one. */
+	ref: string;
+	title: string;
+	subtitle?: string;
+	badges?: string[];
 }
 
 export type { JobStatus };
@@ -61,8 +72,8 @@ export interface JobRegistry {
 	runningJob(): Job | undefined;
 	/** Every job the registry still holds, oldest first. */
 	listJobs(): Job[];
-	/** True when a queued or running job already targets this path. */
-	hasActiveJobFor(audioPath: string): boolean;
+	/** True when a queued or running job of this kind already targets `ref`. */
+	hasActiveJobFor(kind: JobKind, ref: string): boolean;
 	/** How many jobs are waiting to start. */
 	queuedCount(): number;
 	/** Forgets every terminal job. Returns how many it removed. */
@@ -239,8 +250,9 @@ class JobImpl implements Job {
 		const done = this._status === "done";
 		const summary: JobSummary = {
 			id: this.id,
-			audioPath: this.meta.audioPath,
-			lang: this.meta.lang,
+			kind: this.meta.kind,
+			ref: this.meta.ref,
+			title: this.meta.title,
 			status: this._status,
 			// A finished job reads 100% at the last stage, whatever the final
 			// progress event happened to say.
@@ -250,6 +262,10 @@ class JobImpl implements Job {
 			startedAt: this._startedAt,
 			finishedAt: this._finishedAt,
 		};
+		if (this.meta.subtitle !== undefined) summary.subtitle = this.meta.subtitle;
+		if (this.meta.badges !== undefined && this.meta.badges.length > 0) {
+			summary.badges = this.meta.badges;
+		}
 		if (!done && this.latestProgress.message !== undefined) {
 			summary.message = this.latestProgress.message;
 		}
@@ -366,9 +382,9 @@ export function createJobRegistry(opts: { ttlMs?: number } = {}): JobRegistry {
 		listJobs() {
 			return [...jobs.values()];
 		},
-		hasActiveJobFor(audioPath) {
+		hasActiveJobFor(kind, ref) {
 			for (const job of jobs.values()) {
-				if (job.meta.audioPath !== audioPath) continue;
+				if (job.meta.kind !== kind || job.meta.ref !== ref) continue;
 				if (job.status === "queued" || job.status === "running") return true;
 			}
 			return false;

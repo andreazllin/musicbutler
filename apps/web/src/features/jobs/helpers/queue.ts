@@ -1,4 +1,4 @@
-import { isActiveJob, type JobSummary } from "@musicbutler/shared";
+import { isActiveJob, type JobKind, type JobSummary } from "@musicbutler/shared";
 
 /**
  * Queue order for the screen: the running job first, then the ones still
@@ -23,13 +23,17 @@ export function activeCount(jobs: readonly JobSummary[]): number {
 	return jobs.filter((job) => isActiveJob(job.status)).length;
 }
 
-/** The queued or running job for this song, if there is one. */
+/**
+ * The queued or running job of one kind working on `ref`, if there is one.
+ * A tool asks with its own kind, so two kinds may use the same reference.
+ */
 export function activeJobFor(
 	jobs: readonly JobSummary[],
-	audioPath: string | null,
+	kind: JobKind,
+	ref: string | null,
 ): JobSummary | undefined {
-	if (audioPath === null) return undefined;
-	return jobs.find((job) => job.audioPath === audioPath && isActiveJob(job.status));
+	if (ref === null) return undefined;
+	return jobs.find((job) => job.kind === kind && job.ref === ref && isActiveJob(job.status));
 }
 
 /**

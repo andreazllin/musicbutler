@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { JobSummary, SyncEvent } from "@musicbutler/shared";
 import { createJobRegistry, type JobMeta } from "../src/jobs/registry.ts";
 
-const meta: JobMeta = { audioPath: "Artist Two/Single.m4a", lang: "en-US" };
+const meta: JobMeta = {
+	kind: "lyrics-sync",
+	ref: "Artist Two/Single.m4a",
+	title: "Single.m4a",
+	subtitle: "Artist Two",
+	badges: ["English"],
+};
 
 async function collect(it: AsyncIterable<SyncEvent>, max = 50): Promise<SyncEvent[]> {
 	const out: SyncEvent[] = [];
@@ -119,14 +125,14 @@ describe("jobs/registry", () => {
 });
 
 describe("jobs/registry queue", () => {
-	const metaFor = (audioPath: string): JobMeta => ({ audioPath, lang: "en-US" });
+	const metaFor = (ref: string): JobMeta => ({ kind: "lyrics-sync", ref, title: ref });
 
 	test("one job runs and the rest wait in the order they arrived", () => {
 		const reg = createJobRegistry();
 		const started: string[] = [];
-		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.audioPath));
-		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.audioPath));
-		const c = reg.createJob(metaFor("c.mp3"), (j) => started.push(j.meta.audioPath));
+		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.ref));
+		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.ref));
+		const c = reg.createJob(metaFor("c.mp3"), (j) => started.push(j.meta.ref));
 
 		expect(a.status).toBe("running");
 		expect(b.status).toBe("queued");
@@ -139,8 +145,8 @@ describe("jobs/registry queue", () => {
 	test("finishing the running job starts the next one", async () => {
 		const reg = createJobRegistry();
 		const started: string[] = [];
-		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.audioPath));
-		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.audioPath));
+		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.ref));
+		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.ref));
 
 		a.emit({ type: "done", content: "c", mtimeMs: 1 });
 		// The queue advances on a microtask, so the emit call stack unwinds first.
@@ -154,8 +160,8 @@ describe("jobs/registry queue", () => {
 	test("a failing job still lets the queue move on", async () => {
 		const reg = createJobRegistry();
 		const started: string[] = [];
-		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.audioPath));
-		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.audioPath));
+		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.ref));
+		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.ref));
 
 		a.emit({ type: "error", code: "ALIGN_FAILED", message: "no" });
 		await Promise.resolve();
@@ -167,9 +173,9 @@ describe("jobs/registry queue", () => {
 	test("cancelling a queued job never starts it and keeps the order of the rest", async () => {
 		const reg = createJobRegistry();
 		const started: string[] = [];
-		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.audioPath));
-		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.audioPath));
-		const c = reg.createJob(metaFor("c.mp3"), (j) => started.push(j.meta.audioPath));
+		const a = reg.createJob(metaFor("a.mp3"), (j) => started.push(j.meta.ref));
+		const b = reg.createJob(metaFor("b.mp3"), (j) => started.push(j.meta.ref));
+		const c = reg.createJob(metaFor("c.mp3"), (j) => started.push(j.meta.ref));
 
 		expect(b.cancel()).toBe(true);
 		expect(b.status).toBe("cancelled");
@@ -186,12 +192,12 @@ describe("jobs/registry queue", () => {
 		const a = reg.createJob(metaFor("a.mp3"));
 		reg.createJob(metaFor("b.mp3"));
 
-		expect(reg.hasActiveJobFor("a.mp3")).toBe(true);
-		expect(reg.hasActiveJobFor("b.mp3")).toBe(true);
-		expect(reg.hasActiveJobFor("c.mp3")).toBe(false);
+		expect(reg.hasActiveJobFor("lyrics-sync", "a.mp3")).toBe(true);
+		expect(reg.hasActiveJobFor("lyrics-sync", "b.mp3")).toBe(true);
+		expect(reg.hasActiveJobFor("lyrics-sync", "c.mp3")).toBe(false);
 
 		a.emit({ type: "done", content: "c", mtimeMs: 1 });
-		expect(reg.hasActiveJobFor("a.mp3")).toBe(false);
+		expect(reg.hasActiveJobFor("lyrics-sync", "a.mp3")).toBe(false);
 		reg.clear();
 	});
 
@@ -243,7 +249,7 @@ describe("jobs/registry queue", () => {
 
 		const a = reg.createJob(metaFor("a.mp3"));
 		const first = (await it.next()).value as JobSummary[];
-		expect(first.map((j) => j.audioPath)).toEqual(["a.mp3"]);
+		expect(first.map((j) => j.ref)).toEqual(["a.mp3"]);
 
 		a.emit({ type: "done", content: "c", mtimeMs: 1 });
 		const second = (await it.next()).value as JobSummary[];

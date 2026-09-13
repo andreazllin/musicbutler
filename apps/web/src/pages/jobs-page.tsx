@@ -1,13 +1,12 @@
 import { Alert, Box, Button, Center, Group, Stack, Text, ThemeIcon } from "@mantine/core";
-import { isActiveJob } from "@musicbutler/shared";
+import { isActiveJob, type JobSummary } from "@musicbutler/shared";
 import { IconAlertTriangle, IconListCheck } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
 import { type FunctionComponent, useEffect, useState } from "react";
 import { JobRow } from "@/features/jobs/components/JobRow";
 import { activeCount, sortForDisplay } from "@/features/jobs/helpers/queue";
 import { useCancelJob, useClearFinishedJobs, useJobs } from "@/features/jobs/hooks/use-jobs";
-import { SONG_QUERY_KEY } from "@/features/lyrics-sync/constants";
-import { encodeBase64Url } from "@/lib/base64url";
+import { jobKindUi } from "@/features/jobs/registry";
 
 /** How often the run-time counters move while a job is on the screen. */
 const TICK_MS = 1000;
@@ -36,11 +35,10 @@ export const JobsPage: FunctionComponent = () => {
 	const active = activeCount(jobs);
 	const finished = jobs.length - active;
 
-	const openSong = (audioPath: string) => {
-		void navigate({
-			to: "/tools/lyrics-sync",
-			search: { [SONG_QUERY_KEY]: encodeBase64Url(audioPath) },
-		});
+	// The queue does not know where a job of a given kind is edited. Its kind does.
+	const openJob = (job: JobSummary) => {
+		const link = jobKindUi(job.kind).linkTo(job.ref);
+		if (link !== null) void navigate(link);
 	};
 
 	let queuePosition = 0;
@@ -102,7 +100,7 @@ export const JobsPage: FunctionComponent = () => {
 									now={now}
 									onCancel={cancel}
 									isCancelling={pendingId === job.id}
-									onOpen={openSong}
+									onOpen={openJob}
 								/>
 							);
 						})}
