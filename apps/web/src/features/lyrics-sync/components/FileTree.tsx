@@ -4,17 +4,16 @@ import {
 	Box,
 	Button,
 	Group,
-	mergeAsyncChildren,
 	type RenderTreeNodePayload,
 	Skeleton,
 	Stack,
 	Text,
 	TextInput,
 	Tree,
-	type TreeNodeData,
 	useTree,
 } from "@mantine/core";
-import { type Entry, isAudioFile } from "@musicbutler/shared";
+import { useDebouncedValue } from "@mantine/hooks";
+import { isAudioFile } from "@musicbutler/shared";
 import {
 	IconAlertTriangle,
 	IconChevronRight,
@@ -24,7 +23,6 @@ import {
 	IconMusic,
 	IconSearch,
 } from "@tabler/icons-react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
 	type FunctionComponent,
 	type ReactNode,
@@ -32,12 +30,17 @@ import {
 	useEffect,
 	useMemo,
 	useRef,
-	useState,
 } from "react";
-import { useTRPC } from "@/lib/trpc";
 import { useLyricsSyncStore } from "@/stores/lyrics-sync-store";
 import { ancestorsOf } from "../helpers/paths";
-import { useLibraryDir } from "../hooks/use-library-dir";
+import {
+	directoryPaths,
+	filterNodes,
+	MAX_FILTER_RESULTS,
+	nodePropsOf,
+	toNodes,
+} from "../helpers/tree";
+import { useLibraryTree } from "../hooks/use-library-tree";
 import classes from "./FileTree.module.css";
 
 type Props = {
@@ -46,141 +49,96 @@ type Props = {
 	onSelectAudio: (path: string) => void;
 };
 
-/** A library entry, carried on the node so `renderNode` can read kind and badges. */
-type NodeProps = { entry: Entry };
-
-function toNode(entry: Entry): TreeNodeData {
-	return {
-		value: entry.path,
-		label: entry.name,
-		// A directory with children loads them the first time it is expanded.
-		hasChildren: entry.kind === "dir" && entry.childCount > 0,
-		nodeProps: { entry } satisfies NodeProps,
-	};
-}
-
-const entryOf = (node: TreeNodeData): Entry | undefined =>
-	(node.nodeProps as NodeProps | undefined)?.entry;
-
 /**
- * The library tree (docs/PLAN.md §7.3). Directories load one level at a time
- * over `library.list`; nothing walks the whole library. The filter box narrows
- * the loaded nodes only. Every data surface handles pending, error and empty.
+ * The library tree (docs/PLAN.md §7.3). The whole library arrives in one
+ * `library.tree` query, so the filter reaches every folder and song at any
+ * depth without the user opening anything first. Every data surface handles
+ * pending, error and empty.
  */
 export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio }) => {
-	const trpc = useTRPC();
-	const queryClient = useQueryClient();
 	const expanded = useLyricsSyncStore((s) => s.expanded);
 	const setExpandedState = useLyricsSyncStore((s) => s.setExpandedState);
-	// Read by the reveal effect below, which must not re-run on every expansion.
-	const expandedRef = useRef(expanded);
-	expandedRef.current = expanded;
 	const treeFilter = useLyricsSyncStore((s) => s.treeFilter);
 	const setTreeFilter = useLyricsSyncStore((s) => s.setTreeFilter);
-	const root = useLibraryDir("");
+	const library = useLibraryTree();
 
-	// Every library path seen so far that is a directory. `useTree` keeps the
-	// callbacks it was given on the first render, so the selection handler reads
-	// this ref instead of closing over the node data, which would be stale.
-	const dirPaths = useRef(new Set<string>());
-	const remember = useCallback((entries: Entry[]) => {
-		for (const entry of entries) if (entry.kind === "dir") dirPaths.current.add(entry.path);
-		return entries.map(toNode);
+	const all = useMemo(() => toNodes(library.data?.children ?? []), [library.data]);
+	// Matching is cheap; drawing the result is not. Debouncing keeps a keystroke
+	// from redrawing hundreds of rows before the next one lands.
+	const [query] = useDebouncedValue(treeFilter, 150);
+	const {
+		nodes,
+		expand,
+		truncated: tooManyMatches,
+	} = useMemo(() => filterNodes(all, query), [all, query]);
+
+	// `useTree` keeps the callbacks it was given on the first render, so anything
+	// they read comes from a ref. Passing the handler directly froze the caller's
+	// unsaved-changes check at its first value, and passing the node data froze it
+	// empty, which made every folder click select the folder as a song.
+	const onSelectAudioRef = useRef(onSelectAudio);
+	onSelectAudioRef.current = onSelectAudio;
+	const dirPaths = useMemo(() => directoryPaths(library.data?.children ?? []), [library.data]);
+	const dirPathsRef = useRef(dirPaths);
+	dirPathsRef.current = dirPaths;
+
+	const onSelect = useCallback((values: string[]) => {
+		const value = values.at(-1);
+		// Directories expand on click; only audio rows change the selection. The
+		// extension is checked too, so a directory that happens to be named like a
+		// song can never reach `lrc.get`, which rejects anything but an audio file.
+		if (value !== undefined && !dirPathsRef.current.has(value) && isAudioFile(value)) {
+			onSelectAudioRef.current(value);
+		}
 	}, []);
-
-	// The loaded shape of the tree. The root listing seeds it; every expanded
-	// directory grafts its own listing on through `mergeAsyncChildren`.
-	const [loaded, setLoaded] = useState<TreeNodeData[]>([]);
-	const rootNodes = useMemo(() => remember(root.data?.entries ?? []), [root.data, remember]);
-	const data = loaded.length > 0 ? loaded : rootNodes;
-
-	const loadChildren = useCallback(
-		async (path: string) => {
-			const listing = await queryClient.fetchQuery(trpc.library.list.queryOptions({ path }));
-			const children = remember(listing.entries);
-			setLoaded((current) =>
-				mergeAsyncChildren(current.length > 0 ? current : rootNodes, path, children),
-			);
-		},
-		[queryClient, trpc, rootNodes, remember],
-	);
 
 	const selectedState = useMemo(
 		() => (selectedPath === null ? [] : [selectedPath]),
 		[selectedPath],
 	);
 
-	/**
-	 * Opens the path down to the selected song. A link or a reload otherwise
-	 * lands on a song with the tree collapsed, and in a library whose shape is
-	 * unknown there is nothing to say which folders to open to reach it. The
-	 * listings load top down, because a directory can only be grafted on once
-	 * its parent is there. Runs once per song; picking one in the tree finds
-	 * every ancestor already open and does nothing.
-	 */
-	const revealed = useRef<string | null>(null);
-	useEffect(() => {
-		if (selectedPath === null || !root.isSuccess) return;
-		if (revealed.current === selectedPath) return;
-		revealed.current = selectedPath;
-
-		const chain = ancestorsOf(selectedPath).filter((dir) => dir !== "");
-		if (chain.every((dir) => expandedRef.current[dir])) return;
-
-		let cancelled = false;
-		void (async () => {
-			for (const dir of chain) {
-				if (cancelled) return;
-				try {
-					await loadChildren(dir);
-				} catch {
-					// The folder is gone or unreadable. The tree stays where it is; the
-					// editor surfaces the failure for the song itself.
-					return;
-				}
-			}
-			if (cancelled) return;
-			setExpandedState({
-				...expandedRef.current,
-				...Object.fromEntries(chain.map((dir) => [dir, true])),
-			});
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [selectedPath, root.isSuccess, loadChildren, setExpandedState]);
-
-	// `useTree` keeps the callbacks it was given on the first render, so the
-	// handler is read from a ref. Passing it directly froze the caller's
-	// unsaved-changes check at its first value, and switching songs from the tree
-	// discarded unsaved edits without asking.
-	const onSelectAudioRef = useRef(onSelectAudio);
-	onSelectAudioRef.current = onSelectAudio;
-
-	const onSelect = useCallback((values: string[]) => {
-		const value = values.at(-1);
-		// Directories expand on click; only audio rows change the selection. The
-		// extension is checked too, so a directory the ref has not seen yet can
-		// never reach `lrc.get`, which rejects anything that is not an audio file.
-		if (value !== undefined && !dirPaths.current.has(value) && isAudioFile(value)) {
-			onSelectAudioRef.current(value);
-		}
-	}, []);
+	// While the filter is on, the folders holding the matches are forced open so
+	// the results are on screen. Mantine writes that back through
+	// `onExpandedStateChange`, so the path stays open after the filter is
+	// cleared: you search, you find it, and it is still where you can see it.
+	const expandedState = useMemo(() => {
+		if (expand.length === 0) return expanded;
+		return { ...expanded, ...Object.fromEntries(expand.map((path) => [path, true])) };
+	}, [expanded, expand]);
 
 	const tree = useTree({
-		expandedState: expanded,
+		expandedState,
 		onExpandedStateChange: setExpandedState,
 		selectedState,
 		onSelectedStateChange: onSelect,
-		onLoadChildren: loadChildren,
 	});
+
+	/**
+	 * Opens the path down to the selected song. A link or a reload otherwise
+	 * lands on a song with the tree collapsed, and in a library whose shape is
+	 * unknown there is nothing to say which folders to open to reach it.
+	 */
+	const expandedRef = useRef(expanded);
+	expandedRef.current = expanded;
+	const revealed = useRef<string | null>(null);
+	useEffect(() => {
+		if (selectedPath === null || !library.isSuccess) return;
+		if (revealed.current === selectedPath) return;
+		revealed.current = selectedPath;
+		const chain = ancestorsOf(selectedPath).filter((dir) => dir !== "");
+		if (chain.every((dir) => expandedRef.current[dir])) return;
+		setExpandedState({
+			...expandedRef.current,
+			...Object.fromEntries(chain.map((dir) => [dir, true])),
+		});
+	}, [selectedPath, library.isSuccess, setExpandedState]);
 
 	return (
 		<Stack gap={0} h="100%" mih={0}>
 			<Box p="sm" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
 				<TextInput
-					aria-label="Filter loaded songs and folders"
-					placeholder="Filter loaded items"
+					aria-label="Filter the library"
+					placeholder="Search folders and songs"
 					size="sm"
 					leftSection={<IconSearch size={16} />}
 					value={treeFilter}
@@ -188,70 +146,60 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 				/>
 			</Box>
 			<Box flex={1} mih={0} p="xs" style={{ overflow: "auto" }}>
-				{root.isPending ? (
+				{library.isPending ? (
 					<TreeSkeleton />
-				) : root.isError ? (
+				) : library.isError ? (
 					<SurfaceError
-						title="The library could not be listed"
-						detail={root.error.message}
-						onRetry={() => void root.refetch()}
+						title="The library could not be read"
+						detail={library.error.message}
+						onRetry={() => void library.refetch()}
 					/>
-				) : root.data.entries.length === 0 ? (
+				) : all.length === 0 ? (
 					<EmptySurface
 						title="Nothing here yet"
 						description="Point MUSIC_DIR at a library that holds audio files. Supported formats include mp3, flac, m4a, ogg and opus."
 					/>
+				) : nodes.length === 0 ? (
+					<EmptySurface
+						title="No matches"
+						description={`Nothing in the library matches “${query}”.`}
+					/>
 				) : (
-					<FilteredTree tree={tree} data={data} filter={treeFilter} />
+					<>
+						{tooManyMatches && (
+							<Alert color="blue" variant="light" icon={<IconSearch size={16} />} mb="xs" p="xs">
+								<Text fz="xs">
+									Showing the first {MAX_FILTER_RESULTS} matches. Type more to narrow them.
+								</Text>
+							</Alert>
+						)}
+						{library.data.truncated && (
+							<Alert
+								color="yellow"
+								variant="light"
+								icon={<IconAlertTriangle size={16} />}
+								mb="xs"
+								p="xs"
+							>
+								<Text fz="xs">
+									This library is larger than the tree shows. The first{" "}
+									{library.data.count.toLocaleString()} folders and songs are listed.
+								</Text>
+							</Alert>
+						)}
+						<Tree
+							tree={tree}
+							data={nodes}
+							aria-label="Music library"
+							levelOffset={16}
+							selectOnClick
+							expandOnClick
+							renderNode={renderNode}
+						/>
+					</>
 				)}
 			</Box>
 		</Stack>
-	);
-};
-
-type FilteredProps = {
-	tree: ReturnType<typeof useTree>;
-	data: TreeNodeData[];
-	filter: string;
-};
-
-/**
- * The tree itself. The filter narrows the loaded nodes only: a directory stays
- * visible while it is expanded, so filtering never collapses the path the user
- * is looking at.
- */
-const FilteredTree: FunctionComponent<FilteredProps> = ({ tree, data, filter }) => {
-	const needle = filter.trim().toLowerCase();
-	const visible = useMemo(() => {
-		if (!needle) return data;
-		const keep = (nodes: TreeNodeData[]): TreeNodeData[] =>
-			nodes.flatMap((node) => {
-				const children = node.children ? keep(node.children) : undefined;
-				const matches = String(node.label).toLowerCase().includes(needle);
-				if (!matches && (children === undefined || children.length === 0)) return [];
-				return [{ ...node, children }];
-			});
-		return keep(data);
-	}, [data, needle]);
-
-	if (visible.length === 0) {
-		return (
-			<EmptySurface
-				title="No matches"
-				description={`Nothing loaded matches “${filter}”. Clear the filter or expand more folders.`}
-			/>
-		);
-	}
-	return (
-		<Tree
-			tree={tree}
-			data={visible}
-			aria-label="Music library"
-			levelOffset={16}
-			selectOnClick
-			expandOnClick
-			renderNode={renderNode}
-		/>
 	);
 };
 
@@ -261,13 +209,9 @@ function renderNode({
 	expanded,
 	hasChildren,
 	elementProps,
-	tree,
-	isLoading,
-	loadError,
 }: RenderTreeNodePayload): ReactNode {
-	const entry = entryOf(node);
-	const dir = entry?.kind === "dir" ? entry : null;
-	const isDir = dir !== null;
+	const props = nodePropsOf(node);
+	const isDir = props?.kind === "dir";
 	return (
 		<div {...elementProps} className={`${elementProps.className} ${classes.node}`}>
 			{isDir ? (
@@ -293,32 +237,12 @@ function renderNode({
 			<Text component="span" flex={1} miw={0} truncate fz="sm" inherit>
 				{node.label}
 			</Text>
-			{isLoading && (
-				<Text component="span" fz="xs" c="dimmed" fs="italic">
-					Loading…
-				</Text>
-			)}
-			{loadError && (
-				<Text
-					component="span"
-					fz="xs"
-					c="red"
-					title={loadError.message}
-					onClick={(event) => {
-						event.stopPropagation();
-						tree.invalidateNode(node.value);
-						void tree.loadNode(node.value);
-					}}
-				>
-					Failed — retry
-				</Text>
-			)}
-			{dir !== null && dir.childCount === 0 && (
+			{isDir && props.childCount === 0 && (
 				<Text component="span" fz="xs" c="dimmed">
 					empty
 				</Text>
 			)}
-			{entry?.kind === "audio" && entry.hasLrc && (
+			{props?.kind === "audio" && props.hasLrc && (
 				<Badge
 					color="teal"
 					variant="light"

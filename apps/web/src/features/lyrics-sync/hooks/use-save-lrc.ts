@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import { notify } from "@/lib/notify";
 import { useTRPC } from "@/lib/trpc";
-import { parentDirOf } from "../helpers/paths";
+import { setHasLrc } from "../helpers/set-has-lrc";
 
 type SaveError = TRPCClientErrorLike<AppRouter>;
 
@@ -31,20 +31,24 @@ export function useSaveLrc() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		...trpc.lrc.save.mutationOptions(),
-		onSuccess: (result) => {
-			if (result.action === "written") notify.success("Lyrics saved");
-			else if (result.action === "deleted") notify.success("Lyrics file deleted");
-		},
 		onError: (error) => {
 			if (error.data?.code !== "CONFLICT") notify.error(saveErrorMessage(error));
+		},
+		onSuccess: (result, variables) => {
+			if (result.action === "written") notify.success("Lyrics saved");
+			else if (result.action === "deleted") notify.success("Lyrics file deleted");
+			// The tree carries the hasLrc badge (docs/PLAN.md §5.5). One write
+			// settles one flag, so it is patched rather than re-walked.
+			setHasLrc(
+				queryClient,
+				trpc.library.tree.queryKey(),
+				variables.audioPath,
+				result.action === "written",
+			);
 		},
 		onSettled: (_result, _error, variables) => {
 			void queryClient.invalidateQueries({
 				queryKey: trpc.lrc.get.queryKey({ audioPath: variables.audioPath }),
-			});
-			// The parent listing carries the hasLrc badge (docs/PLAN.md §5.5).
-			void queryClient.invalidateQueries({
-				queryKey: trpc.library.list.queryKey({ path: parentDirOf(variables.audioPath) }),
 			});
 		},
 	});

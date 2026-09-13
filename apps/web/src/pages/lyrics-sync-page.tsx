@@ -16,7 +16,7 @@ import { NoSongSelected } from "@/features/lyrics-sync/components/NoSongSelected
 import { SyncButton } from "@/features/lyrics-sync/components/SyncButton";
 import { SyncConfirmDialog } from "@/features/lyrics-sync/components/SyncConfirmDialog";
 import { SyncProgress } from "@/features/lyrics-sync/components/SyncProgress";
-import { parentDirOf } from "@/features/lyrics-sync/helpers/paths";
+import { setHasLrc } from "@/features/lyrics-sync/helpers/set-has-lrc";
 import { useLanguages } from "@/features/lyrics-sync/hooks/use-languages";
 import { useLrcFile } from "@/features/lyrics-sync/hooks/use-lrc-file";
 import { saveErrorMessage, useSaveLrc } from "@/features/lyrics-sync/hooks/use-save-lrc";
@@ -98,9 +98,8 @@ export const LyricsSyncPage: FunctionComponent = () => {
 			primeLrcCache(song, content, mtimeMs);
 			clearBuffer();
 			void queryClient.invalidateQueries({ queryKey: trpc.lrc.get.queryKey({ audioPath: song }) });
-			void queryClient.invalidateQueries({
-				queryKey: trpc.library.list.queryKey({ path: parentDirOf(song) }),
-			});
+			// A finished sync writes the file, so the song now has lyrics.
+			setHasLrc(queryClient, trpc.library.tree.queryKey(), song, true);
 			notify.success("Lyrics synced and saved");
 		},
 		onError: ({ code, message }) => {

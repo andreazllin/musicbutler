@@ -19,7 +19,15 @@ import {
 	unlink,
 } from "node:fs/promises";
 import { basename, dirname, extname, join, sep } from "node:path";
-import { type Entry, extensionOf, isAudioFile, lrcPathFor } from "@musicbutler/shared";
+import {
+	type Entry,
+	extensionOf,
+	isAudioFile,
+	LIBRARY_TREE_MAX_NODES,
+	type LibraryTree,
+	lrcPathFor,
+	type TreeEntry,
+} from "@musicbutler/shared";
 import { TRPCError } from "@trpc/server";
 import { getEnv } from "../env.ts";
 import { childPath, normalizeLibraryPath, parentOf, resolveLibraryPath } from "./paths.ts";
@@ -165,6 +173,88 @@ export async function listDir(rel: string): Promise<Listing> {
 	dirs.sort((a, b) => collator.compare(a.name, b.name));
 	audio.sort((a, b) => collator.compare(a.name, b.name));
 	return { path, parent: parentOf(path), entries: [...dirs, ...audio] };
+}
+
+/**
+ * Walks the whole library so the web tree can hold it and search it at once.
+ *
+ * Cheaper per entry than `listDir`, because the tree draws neither size nor
+ * mtime: a plain file costs no `stat` at all. Three things keep the walk
+ * bounded. Directories are visited one at a time, so the open descriptors stay
+ * to one `readdir` rather than one per directory in the library. A directory
+ * whose real path was already visited is skipped, which is what stops a symlink
+ * back to an ancestor from looping. And the node count stops at
+ * `LIBRARY_TREE_MAX_NODES`, reported as `truncated` so the UI can say the list
+ * is short rather than pretending it is whole.
+ */
+export async function scanTree(): Promise<LibraryTree> {
+	const seen = new Set<string>();
+	let count = 0;
+	let truncated = false;
+
+	async function walk(rel: string, abs: string): Promise<TreeEntry[]> {
+		let real: string;
+		try {
+			real = await realpath(abs);
+		} catch {
+			return [];
+		}
+		if (seen.has(real)) return [];
+		seen.add(real);
+
+		let dirents: Dirent[];
+		try {
+			dirents = await readdir(abs, { withFileTypes: true });
+		} catch {
+			// An unreadable folder is left out rather than failing the whole walk.
+			return [];
+		}
+		const names = new Set(dirents.map((d) => d.name));
+
+		const dirs: Extract<TreeEntry, { kind: "dir" }>[] = [];
+		const audio: Extract<TreeEntry, { kind: "audio" }>[] = [];
+
+		// Classification runs across the directory at once; the recursion below
+		// does not, so the parallelism stays inside a single directory.
+		const kinds = await Promise.all(dirents.map((d) => classify(abs, d)));
+
+		for (const [i, d] of dirents.entries()) {
+			if (kinds[i] === "hidden") continue;
+			if (count >= LIBRARY_TREE_MAX_NODES) {
+				truncated = true;
+				break;
+			}
+			count += 1;
+			const entryPath = childPath(rel, d.name);
+			if (kinds[i] === "dir") {
+				dirs.push({ kind: "dir", name: d.name, path: entryPath, children: [] });
+			} else {
+				audio.push({
+					kind: "audio",
+					name: d.name,
+					path: entryPath,
+					ext: extensionOf(d.name),
+					hasLrc: names.has(basename(lrcPathFor(d.name))),
+				});
+			}
+		}
+
+		for (const dir of dirs) {
+			if (count >= LIBRARY_TREE_MAX_NODES) {
+				truncated = true;
+				break;
+			}
+			dir.children = await walk(dir.path, join(abs, dir.name));
+		}
+
+		dirs.sort((a, b) => collator.compare(a.name, b.name));
+		audio.sort((a, b) => collator.compare(a.name, b.name));
+		return [...dirs, ...audio];
+	}
+
+	const rootAbs = await resolveLibraryPath("");
+	const children = await walk("", rootAbs);
+	return { children, count, truncated };
 }
 
 // ---------------------------------------------------------------------------

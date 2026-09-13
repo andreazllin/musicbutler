@@ -259,8 +259,8 @@ LF line endings. End the file with exactly one newline. Set the file mode to
 Every path that crosses the API is **relative to the library root**. It uses
 POSIX separators and no leading slash, for example
 `Artist/Album/01 Track.flac`. The depth is whatever the library happens to use:
-nothing assumes an artist and album pair, and `library.list` walks one level at
-a time, so a path may hold any number of segments.
+nothing assumes an artist and album pair, so a path may hold any number of
+segments.
 
 `apps/server/src/fs/paths.ts` is the only module that may turn such a path into
 an absolute path. It must do three things:
@@ -340,11 +340,21 @@ changes nothing else.
 
 ```ts
 // ---- library ----
-// Lazy, one directory at a time. Never walk the whole library.
-// A real library can hold hundreds of thousands of files.
+// One directory at a time. Kept for callers that want a single listing.
 library.list
   input:  { path: string }                    // "" = library root
   output: { path: string; parent: string | null; entries: Entry[] }
+
+// The whole library in one walk, so the web tree can search every folder and
+// song without the user opening them first. Stops at LIBRARY_TREE_MAX_NODES and
+// says so, because a real library can hold hundreds of thousands of files.
+library.tree
+  input:  none
+  output: { children: TreeEntry[]; count: number; truncated: boolean }
+
+type TreeEntry =
+  | { kind: 'dir';   name: string; path: string; children: TreeEntry[] }
+  | { kind: 'audio'; name: string; path: string; ext: string; hasLrc: boolean }
 
 type Entry =
   | { kind: 'dir';   name: string; path: string; childCount: number }
@@ -465,12 +475,15 @@ takes over.
 
 The screen holds two resizable columns.
 
-**The left column holds the library tree.** It loads lazily over `library.list`,
-so expanding a directory fetches its children. Per §5.5 the tree hides `.lrc`
-entries, and an audio row shows a "has lyrics" badge. Selecting an audio row
-sets the selection and loads the `.lrc` file for that song. If the buffer holds
-unsaved changes, ask before you switch, and offer discard or cancel. Add a
-filter box that narrows the loaded nodes only. v1 has no server side search.
+**The left column holds the library tree.** The whole library arrives in one
+`library.tree` query, so the filter can reach any folder or song without the
+user opening the folders first. Per §5.5 the tree hides `.lrc` entries, and an
+audio row shows a "has lyrics" badge. Selecting an audio row sets the selection
+and loads the `.lrc` file for that song. If the buffer holds unsaved changes,
+ask before you switch, and offer discard or cancel. The filter matches fuzzily
+on both the name and the whole path, over folders and songs alike, and opens
+the folders holding the matches. Search is client side: the tree is already in
+memory, so the server does no matching.
 
 Every data surface here handles three outcomes: pending, error, and empty. Build
 them per `docs/frontend-structure.md` §4 item 3, and branch on `isPending`.

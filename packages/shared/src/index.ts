@@ -74,6 +74,32 @@ export function lrcPathFor(audioPath: LibraryPath): LibraryPath {
 	return `${audioPath.slice(0, slash + 1)}${base}.lrc`;
 }
 
+/**
+ * One node of the whole-library tree (`library.tree`). It carries only what the
+ * tree draws: no size and no mtime, which keeps a large library's payload down.
+ */
+export type TreeEntry =
+	| { kind: "dir"; name: string; path: LibraryPath; children: TreeEntry[] }
+	| { kind: "audio"; name: string; path: LibraryPath; ext: string; hasLrc: boolean };
+
+/**
+ * The whole library in one response. `truncated` is set when the walk stopped at
+ * `LIBRARY_TREE_MAX_NODES`, so the UI can say the list is incomplete rather than
+ * quietly showing part of it.
+ */
+export type LibraryTree = {
+	children: TreeEntry[];
+	count: number;
+	truncated: boolean;
+};
+
+/**
+ * Ceiling on the nodes one `library.tree` walk returns. A library past this is
+ * unusual, and the cap is what stops an enormous or looping directory from
+ * holding the event loop and the response open.
+ */
+export const LIBRARY_TREE_MAX_NODES = 50_000;
+
 /** One row of `library.list` (docs/PLAN.md §6.2). */
 export type Entry =
 	| { kind: "dir"; name: string; path: LibraryPath; childCount: number }
