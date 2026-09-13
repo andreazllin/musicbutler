@@ -1,4 +1,4 @@
-import { IconMusic } from "@tabler/icons-react";
+import { IconListCheck, IconMusic } from "@tabler/icons-react";
 import { type ComponentType, createElement, lazy, type ReactNode } from "react";
 
 /**
@@ -19,6 +19,8 @@ const LyricsSyncPage = lazy(() =>
 	import("@/pages/lyrics-sync-page").then((m) => ({ default: m.LyricsSyncPage })),
 );
 
+const JobsPage = lazy(() => import("@/pages/jobs-page").then((m) => ({ default: m.JobsPage })));
+
 export const TOOLS = [
 	{
 		id: "lyrics-sync",
@@ -26,6 +28,13 @@ export const TOOLS = [
 		icon: IconMusic,
 		path: "/tools/lyrics-sync",
 		element: () => createElement(LyricsSyncPage),
+	},
+	{
+		id: "jobs",
+		label: "Sync queue",
+		icon: IconListCheck,
+		path: "/tools/jobs",
+		element: () => createElement(JobsPage),
 	},
 ] as const satisfies readonly ToolDefinition[];
 

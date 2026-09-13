@@ -133,6 +133,48 @@ export const SYNC_STAGES = [
 ] as const;
 export type SyncStage = (typeof SYNC_STAGES)[number];
 
+/**
+ * State of one job in the queue. A job is `queued` until the runner takes it,
+ * then `running`, then one of the three terminal states.
+ */
+export const JOB_STATUSES = ["queued", "running", "done", "error", "cancelled"] as const;
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+/** True while the job still holds a place in the queue. */
+export function isActiveJob(status: JobStatus): boolean {
+	return status === "queued" || status === "running";
+}
+
+/**
+ * One row of `jobs.list`. It carries what the queue screen draws and nothing
+ * else: the lyric text and the aligned result stay on the `sync.progress`
+ * stream, because a job list must not grow with the size of the lyrics.
+ */
+export type JobSummary = {
+	id: string;
+	audioPath: LibraryPath;
+	lang: Lang;
+	status: JobStatus;
+	stage: SyncStage;
+	pct: number;
+	message?: string;
+	/** Milliseconds since epoch. */
+	createdAt: number;
+	/** Set when the runner took the job out of the queue, else null. */
+	startedAt: number | null;
+	/** Set when the job reached a terminal state, else null. */
+	finishedAt: number | null;
+	/** Set on `error` and `cancelled`. */
+	error?: string;
+};
+
+/**
+ * Ceiling on jobs waiting in the queue. The queue is in memory and dies with
+ * the process, so a caller that queues without limit only builds a backlog it
+ * cannot finish.
+ */
+export const MAX_QUEUED_JOBS = 100;
+
 /** Events yielded by the `sync.progress` subscription (docs/PLAN.md §6.2). */
 export type SyncEvent =
 	| { type: "progress"; stage: SyncStage; pct: number; message?: string }

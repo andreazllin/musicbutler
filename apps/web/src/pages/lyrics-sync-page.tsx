@@ -16,6 +16,7 @@ import { NoSongSelected } from "@/features/lyrics-sync/components/NoSongSelected
 import { SyncButton } from "@/features/lyrics-sync/components/SyncButton";
 import { SyncConfirmDialog } from "@/features/lyrics-sync/components/SyncConfirmDialog";
 import { SyncProgress } from "@/features/lyrics-sync/components/SyncProgress";
+import { baseNameOf } from "@/features/lyrics-sync/helpers/paths";
 import { setHasLrc } from "@/features/lyrics-sync/helpers/set-has-lrc";
 import { useLanguages } from "@/features/lyrics-sync/hooks/use-languages";
 import { useLrcFile } from "@/features/lyrics-sync/hooks/use-lrc-file";
@@ -92,15 +93,19 @@ export const LyricsSyncPage: FunctionComponent = () => {
 	);
 
 	const sync = useSyncJob({
-		onDone: ({ content, mtimeMs }) => {
-			if (!song) return;
-			editorRef.current?.replaceText(content);
-			primeLrcCache(song, content, mtimeMs);
-			clearBuffer();
-			void queryClient.invalidateQueries({ queryKey: trpc.lrc.get.queryKey({ audioPath: song }) });
+		song,
+		onDone: ({ audioPath, content, mtimeMs }) => {
+			// The result belongs to the song that was aligned. The user may have
+			// moved on, so only touch the editor when that song is still open.
+			if (audioPath === song) {
+				editorRef.current?.replaceText(content);
+				clearBuffer();
+			}
+			primeLrcCache(audioPath, content, mtimeMs);
+			void queryClient.invalidateQueries({ queryKey: trpc.lrc.get.queryKey({ audioPath }) });
 			// A finished sync writes the file, so the song now has lyrics.
-			setHasLrc(queryClient, trpc.library.tree.queryKey(), song, true);
-			notify.success("The sync finished and saved the lyrics.");
+			setHasLrc(queryClient, trpc.library.tree.queryKey(), audioPath, true);
+			notify.success(`The sync finished and saved the lyrics for ${baseNameOf(audioPath)}.`);
 		},
 		onError: ({ code, message }) => {
 			if (code === "CANCELLED") notify.info("You cancelled the sync. The file did not change.");

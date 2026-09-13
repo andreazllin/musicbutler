@@ -1,11 +1,12 @@
 /**
  * `sync.*` procedures (docs/PLAN.md §6.2, §7.5, §13.13).
  *
- * `start` runs one job at a time and returns at once; `progress` streams the
- * job's events over SSE; `cancel` aborts it. The engine wiring lives in
- * `../sync/engine.ts`.
+ * `start` queues a job and returns at once; `progress` streams the job's events
+ * over SSE; `cancel` aborts it, whether it runs or still waits. The queue runs
+ * one job at a time and is owned by `../jobs/registry.ts`; the engine wiring
+ * lives in `../sync/engine.ts`.
  */
-import { isAudioFile, LANGS, type SyncEvent } from "@musicbutler/shared";
+import { isAudioFile, LANGS, MAX_QUEUED_JOBS, type SyncEvent } from "@musicbutler/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { jobs } from "../jobs/registry.ts";
@@ -50,8 +51,18 @@ export const syncRouter = router({
 		.input(syncStartInput)
 		.output(syncStartOutput)
 		.mutation(async ({ input }) => {
-			if (jobs.hasRunningJob()) {
-				throw new TRPCError({ code: "CONFLICT", message: "A sync is already running" });
+			// Two jobs on one song would race to write the same .lrc file.
+			if (jobs.hasActiveJobFor(input.audioPath)) {
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: "This song is already in the queue.",
+				});
+			}
+			if (jobs.queuedCount() >= MAX_QUEUED_JOBS) {
+				throw new TRPCError({
+					code: "TOO_MANY_REQUESTS",
+					message: "The queue is full. Wait for a job to finish.",
+				});
 			}
 			const langs = await listLanguages();
 			if (!langs.find((l) => l.code === input.lang)?.available) {
@@ -60,12 +71,11 @@ export const syncRouter = router({
 					message: `No model is installed for ${input.lang}`,
 				});
 			}
-			const job = jobs.createJob({
-				audioPath: input.audioPath,
-				lang: input.lang,
-				options: input.options,
-			});
-			runSyncJob(job, input);
+			// The queue calls the runner once this job reaches the front.
+			const job = jobs.createJob(
+				{ audioPath: input.audioPath, lang: input.lang, options: input.options },
+				(queued) => runSyncJob(queued, input),
+			);
 			return { jobId: job.id };
 		}),
 

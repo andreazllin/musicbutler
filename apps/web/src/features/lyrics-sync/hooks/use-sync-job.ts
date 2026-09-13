@@ -1,7 +1,9 @@
 import type { SyncEvent, SyncStage } from "@musicbutler/shared";
 import { useMutation } from "@tanstack/react-query";
 import { useSubscription } from "@trpc/tanstack-react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { activeJobFor } from "@/features/jobs/helpers/queue";
+import { useJobs } from "@/features/jobs/hooks/use-jobs";
 import { notify } from "@/lib/notify";
 import { useTRPC } from "@/lib/trpc";
 
@@ -15,32 +17,46 @@ type StartInput = {
 };
 
 type Handlers = {
-	onDone: (result: { content: string; mtimeMs: number }) => void;
-	onError: (error: { code: string; message: string }) => void;
+	/** The song the screen shows now. The hook follows the job for this song. */
+	song: string | null;
+	onDone: (result: { audioPath: string; content: string; mtimeMs: number }) => void;
+	onError: (error: { audioPath: string; code: string; message: string }) => void;
 };
 
 /**
- * Starts, follows and cancels one sync job (docs/PLAN.md §6.2 `sync.*`, §7.5).
- * Progress arrives over the SSE subscription. Job state is server state, so the
- * only local state is the id of the job this screen follows.
+ * Follows the sync job of one song (docs/PLAN.md §6.2 `sync.*`, §7.5).
+ *
+ * The job belongs to the server, not to this screen. The hook holds the id and
+ * the path of the job it follows, and the path is what the result is applied
+ * to: a user may switch songs while a job runs, and the finished lyrics must
+ * reach the song that was aligned, never the song that happens to be open.
+ *
+ * When the screen opens on a song that already has a job in the queue, the hook
+ * adopts it, so leaving the screen and coming back picks the progress up again.
  */
-export function useSyncJob({ onDone, onError }: Handlers) {
+export function useSyncJob({ song, onDone, onError }: Handlers) {
 	const trpc = useTRPC();
-	const [jobId, setJobId] = useState<string | null>(null);
+	const { jobs } = useJobs();
+	const [job, setJob] = useState<{ id: string; audioPath: string } | null>(null);
 	const [progress, setProgress] = useState<SyncProgressState | null>(null);
+
+	// Adopt the job the server already holds for this song.
+	const serverJob = activeJobFor(jobs, song);
+	useEffect(() => {
+		if (serverJob === undefined) return;
+		setJob((current) =>
+			current?.id === serverJob.id ? current : { id: serverJob.id, audioPath: serverJob.audioPath },
+		);
+	}, [serverJob]);
 
 	const start = useMutation({
 		...trpc.sync.start.mutationOptions(),
-		onSuccess: ({ jobId }) => {
+		onSuccess: ({ jobId }, variables) => {
 			setProgress({ stage: "queued", pct: 0 });
-			setJobId(jobId);
+			setJob({ id: jobId, audioPath: variables.audioPath });
 		},
 		onError: (error) => {
-			const message =
-				error.data?.code === "CONFLICT"
-					? "A different sync is in progress. Wait for it to complete."
-					: error.message || "The sync could not start.";
-			notify.error(message);
+			notify.error(error.message || "The sync could not start.");
 		},
 	});
 
@@ -50,29 +66,34 @@ export function useSyncJob({ onDone, onError }: Handlers) {
 	});
 
 	const finish = useCallback(() => {
-		setJobId(null);
+		setJob(null);
 		setProgress(null);
 	}, []);
 
 	useSubscription(
 		trpc.sync.progress.subscriptionOptions(
-			{ jobId: jobId ?? "" },
+			{ jobId: job?.id ?? "" },
 			{
-				enabled: jobId !== null,
+				enabled: job !== null,
 				onData: (event: SyncEvent) => {
+					const audioPath = job?.audioPath;
+					if (audioPath === undefined) return;
 					if (event.type === "progress") {
 						setProgress({ stage: event.stage, pct: event.pct, message: event.message });
 					} else if (event.type === "done") {
 						finish();
-						onDone({ content: event.content, mtimeMs: event.mtimeMs });
+						onDone({ audioPath, content: event.content, mtimeMs: event.mtimeMs });
 					} else {
 						finish();
-						onError({ code: event.code, message: event.message });
+						onError({ audioPath, code: event.code, message: event.message });
 					}
 				},
 				onError: (error) => {
+					const audioPath = job?.audioPath;
 					finish();
+					if (audioPath === undefined) return;
 					onError({
+						audioPath,
 						code: "SUBSCRIPTION",
 						message: error.message || "The app lost the connection to the job.",
 					});
@@ -81,12 +102,20 @@ export function useSyncJob({ onDone, onError }: Handlers) {
 		),
 	);
 
+	/** True only while this song has a job. A job on another song blocks nothing. */
+	const isRunningForSong = job !== null && job.audioPath === song;
+	const stage = serverJob?.status === "queued" ? "queued" : progress?.stage;
+
 	return {
-		isRunning: jobId !== null || start.isPending,
-		progress,
+		isRunning: isRunningForSong || (start.isPending && start.variables?.audioPath === song),
+		/** Set while this song's job is queued or running. */
+		progress:
+			isRunningForSong && progress !== null
+				? { ...progress, stage: stage ?? progress.stage }
+				: null,
 		start: (input: StartInput) => start.mutate(input),
 		cancel: () => {
-			if (jobId) cancel.mutate({ jobId });
+			if (job) cancel.mutate({ jobId: job.id });
 		},
 		isCancelling: cancel.isPending,
 	};
