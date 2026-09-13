@@ -260,9 +260,11 @@ export const LyricsSyncPage: FunctionComponent = () => {
 								onCancel={sync.cancel}
 								isCancelling={sync.isCancelling}
 							/>
+							{/* Destructive, but secondary to Save: an outline rather than a fill, so
+							    the row's only filled button stays the one you are meant to press. */}
 							<Button
 								ml="auto"
-								variant="default"
+								variant="outline"
 								color="red"
 								leftSection={<IconTrash size={18} />}
 								disabled={sync.isRunning || (!lrc.data?.exists && !dirty)}
