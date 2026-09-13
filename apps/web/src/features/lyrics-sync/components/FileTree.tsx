@@ -29,12 +29,14 @@ import {
 	type FunctionComponent,
 	type ReactNode,
 	useCallback,
+	useEffect,
 	useMemo,
 	useRef,
 	useState,
 } from "react";
 import { useTRPC } from "@/lib/trpc";
 import { useLyricsSyncStore } from "@/stores/lyrics-sync-store";
+import { ancestorsOf } from "../helpers/paths";
 import { useLibraryDir } from "../hooks/use-library-dir";
 import classes from "./FileTree.module.css";
 
@@ -70,6 +72,9 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 	const queryClient = useQueryClient();
 	const expanded = useLyricsSyncStore((s) => s.expanded);
 	const setExpandedState = useLyricsSyncStore((s) => s.setExpandedState);
+	// Read by the reveal effect below, which must not re-run on every expansion.
+	const expandedRef = useRef(expanded);
+	expandedRef.current = expanded;
 	const treeFilter = useLyricsSyncStore((s) => s.treeFilter);
 	const setTreeFilter = useLyricsSyncStore((s) => s.setTreeFilter);
 	const root = useLibraryDir("");
@@ -104,6 +109,46 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 		() => (selectedPath === null ? [] : [selectedPath]),
 		[selectedPath],
 	);
+
+	/**
+	 * Opens the path down to the selected song. A link or a reload otherwise
+	 * lands on a song with the tree collapsed, and in a library whose shape is
+	 * unknown there is nothing to say which folders to open to reach it. The
+	 * listings load top down, because a directory can only be grafted on once
+	 * its parent is there. Runs once per song; picking one in the tree finds
+	 * every ancestor already open and does nothing.
+	 */
+	const revealed = useRef<string | null>(null);
+	useEffect(() => {
+		if (selectedPath === null || !root.isSuccess) return;
+		if (revealed.current === selectedPath) return;
+		revealed.current = selectedPath;
+
+		const chain = ancestorsOf(selectedPath).filter((dir) => dir !== "");
+		if (chain.every((dir) => expandedRef.current[dir])) return;
+
+		let cancelled = false;
+		void (async () => {
+			for (const dir of chain) {
+				if (cancelled) return;
+				try {
+					await loadChildren(dir);
+				} catch {
+					// The folder is gone or unreadable. The tree stays where it is; the
+					// editor surfaces the failure for the song itself.
+					return;
+				}
+			}
+			if (cancelled) return;
+			setExpandedState({
+				...expandedRef.current,
+				...Object.fromEntries(chain.map((dir) => [dir, true])),
+			});
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedPath, root.isSuccess, loadChildren, setExpandedState]);
 
 	// `useTree` keeps the callbacks it was given on the first render, so the
 	// handler is read from a ref. Passing it directly froze the caller's

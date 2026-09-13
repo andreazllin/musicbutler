@@ -258,7 +258,9 @@ LF line endings. End the file with exactly one newline. Set the file mode to
 
 Every path that crosses the API is **relative to the library root**. It uses
 POSIX separators and no leading slash, for example
-`Artist/Album/01 Track.flac`.
+`Artist/Album/01 Track.flac`. The depth is whatever the library happens to use:
+nothing assumes an artist and album pair, and `library.list` walks one level at
+a time, so a path may hold any number of segments.
 
 `apps/server/src/fs/paths.ts` is the only module that may turn such a path into
 an absolute path. It must do three things:
