@@ -100,10 +100,10 @@ export const LyricsSyncPage: FunctionComponent = () => {
 			void queryClient.invalidateQueries({ queryKey: trpc.lrc.get.queryKey({ audioPath: song }) });
 			// A finished sync writes the file, so the song now has lyrics.
 			setHasLrc(queryClient, trpc.library.tree.queryKey(), song, true);
-			notify.success("Lyrics synced and saved");
+			notify.success("The sync finished and saved the lyrics.");
 		},
 		onError: ({ code, message }) => {
-			if (code === "CANCELLED") notify.info("Sync cancelled. The file was left untouched.");
+			if (code === "CANCELLED") notify.info("You cancelled the sync. The file did not change.");
 			else notify.error(message);
 		},
 	});
@@ -144,7 +144,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 			const fresh = await trpcClient.lrc.get.query({ audioPath: song });
 			doSave(editorText, fresh.mtimeMs);
 		} catch (error) {
-			notify.error(error instanceof Error ? error.message : "Could not read the file.");
+			notify.error(error instanceof Error ? error.message : "The app could not read the file.");
 		}
 	};
 	const onReload = () => {
@@ -207,7 +207,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 					<Stack gap="sm" flex={1} mih={0} p="md">
 						{lrc.isError ? (
 							<SurfaceError
-								title="The lyrics file could not be read"
+								title="The app could not read the lyrics file"
 								detail={lrc.error.message}
 								onRetry={() => void lrc.refetch()}
 							/>
@@ -220,7 +220,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 								}}
 								disabled={lrc.isPending || sync.isRunning}
 								durationSeconds={duration}
-								placeholder="Paste or type the lyrics here, then press Sync lyrics to generate timestamps."
+								placeholder="Type or paste the lyrics here. Then select Sync lyrics to make the timestamps."
 							/>
 						)}
 
@@ -297,7 +297,8 @@ export const LyricsSyncPage: FunctionComponent = () => {
 				}}
 			>
 				<Text fz="sm">
-					The lyrics for the current song have unsaved edits. Leaving this song throws them away.
+					The lyrics for this song have edits that you did not save. If you leave, the app discards
+					them.
 				</Text>
 			</ConfirmDialog>
 
@@ -316,8 +317,8 @@ export const LyricsSyncPage: FunctionComponent = () => {
 				}
 			>
 				<Text fz="sm">
-					Someone else saved this <Code>.lrc</Code> file since you loaded it. Reload to see their
-					version and lose your edits, or overwrite it with yours.
+					A different user saved this <Code>.lrc</Code> file after you opened it. Select Reload from
+					disk to get that version. Your edits are lost. Select Overwrite to keep your edits.
 				</Text>
 			</ConfirmDialog>
 
@@ -331,8 +332,8 @@ export const LyricsSyncPage: FunctionComponent = () => {
 				isConfirming={save.isPending}
 			>
 				<Text fz="sm">
-					This clears the editor and removes the <Code>.lrc</Code> file from the library. The audio
-					file is not touched.
+					This clears the editor. It also deletes the <Code>.lrc</Code> file from the library. The
+					audio file does not change.
 				</Text>
 				{save.isError && save.error.data?.code !== "CONFLICT" && (
 					<Text fz="sm" c="red">

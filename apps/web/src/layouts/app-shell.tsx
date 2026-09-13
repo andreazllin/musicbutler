@@ -12,7 +12,7 @@ export const AppShell: FunctionComponent = () => (
 			<Suspense
 				fallback={
 					<Center flex={1}>
-						<Loader type="bars" size="md" aria-label="Loading" />
+						<Loader type="bars" size="md" aria-label="Please wait" />
 					</Center>
 				}
 			>

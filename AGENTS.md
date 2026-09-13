@@ -114,6 +114,11 @@ fixtures         A small library used by the tests and by bun run dev
 ## Other conventions
 
 - Files are named in kebab-case.
+- User-facing text follows ASD-STE100 Simplified Technical English. Use the
+  active voice and one instruction per sentence. Keep an instruction under 20
+  words and a description under 25. No semicolons, no contractions, no em
+  dashes, and no `-ing` verb where a simple tense works. Call one thing by one
+  name.
 - The UI is [Mantine](https://mantine.dev) (see `docs/PLAN.md` §4.1). Style with
   Mantine components and style props; use a CSS module only for what props
   cannot say. Icons come from `@tabler/icons-react`. Never hard-code a color:

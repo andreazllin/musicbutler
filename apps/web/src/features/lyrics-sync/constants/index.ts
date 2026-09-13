@@ -17,10 +17,10 @@ export const SONG_QUERY_KEY = "song";
 
 /** Labels for the stages of a sync job. */
 export const SYNC_STAGE_LABELS = {
-	queued: "Queued",
-	decode: "Decoding audio",
-	separate: "Isolating vocals",
-	transcribe: "Listening",
-	align: "Aligning lyrics",
-	write: "Writing .lrc",
+	queued: "In the queue",
+	decode: "Reads the audio",
+	separate: "Isolates the vocals",
+	transcribe: "Listens to the audio",
+	align: "Aligns the lyrics",
+	write: "Writes the .lrc file",
 } as const;

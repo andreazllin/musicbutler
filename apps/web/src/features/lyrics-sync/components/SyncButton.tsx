@@ -26,7 +26,7 @@ export const SyncButton: FunctionComponent<Props> = ({
 		return (
 			<Group gap="xs">
 				<Button variant="default" loading disabled>
-					Syncing…
+					Sync in progress
 				</Button>
 				<Button variant="subtle" color="gray" onClick={onCancel} disabled={isCancelling}>
 					Cancel

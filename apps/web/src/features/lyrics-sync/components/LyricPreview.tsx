@@ -89,7 +89,7 @@ export const LyricPreview: FunctionComponent<Props> = ({ text, audioRef, onApply
 			<ol ref={listRef} onScroll={onScroll} aria-label="Lyric preview" className={classes.list}>
 				{lines.length === 0 ? (
 					<Box component="li" py="lg" ta="center" fz="sm" c="dimmed">
-						No timed lines yet. Write lyrics with [mm:ss.xx] tags, or run Sync lyrics.
+						There are no timed lines. Write lyrics with [mm:ss.xx] tags, or select Sync lyrics.
 					</Box>
 				) : (
 					lines.map((line, i) => (

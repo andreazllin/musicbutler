@@ -38,7 +38,7 @@ export function useSyncJob({ onDone, onError }: Handlers) {
 		onError: (error) => {
 			const message =
 				error.data?.code === "CONFLICT"
-					? "Another sync is already running. Wait for it to finish."
+					? "A different sync is in progress. Wait for it to complete."
 					: error.message || "The sync could not start.";
 			notify.error(message);
 		},
@@ -46,7 +46,7 @@ export function useSyncJob({ onDone, onError }: Handlers) {
 
 	const cancel = useMutation({
 		...trpc.sync.cancel.mutationOptions(),
-		onError: (error) => notify.error(error.message || "Cancelling failed."),
+		onError: (error) => notify.error(error.message || "The app could not cancel the sync."),
 	});
 
 	const finish = useCallback(() => {
@@ -74,7 +74,7 @@ export function useSyncJob({ onDone, onError }: Handlers) {
 					finish();
 					onError({
 						code: "SUBSCRIPTION",
-						message: error.message || "Lost the connection to the job.",
+						message: error.message || "The app lost the connection to the job.",
 					});
 				},
 			},

@@ -35,30 +35,30 @@ export const SyncConfirmDialog: FunctionComponent<Props> = ({
 			<Text fz="sm">
 				The sync{" "}
 				<Text span fw={600} c="var(--mantine-color-text)">
-					discards every timestamp
+					removes every timestamp
 				</Text>{" "}
-				in the editor and generates new ones from the audio.
+				in the editor. It makes new timestamps from the audio.
 			</Text>
 			<Text fz="sm">
-				It also{" "}
+				The sync also{" "}
 				<Text span fw={600} c="var(--mantine-color-text)">
-					overwrites the .lrc file
+					writes the .lrc file
 				</Text>{" "}
-				on disk when it finishes. You do not need to press Save afterwards.
+				on disk when it completes. You do not have to select Save.
 			</Text>
 			<Paper withBorder p="md" bg="var(--mantine-color-default)" mt="xs">
 				<Stack gap="md">
 					<Switch
 						size="sm"
 						label="Isolate vocals first"
-						description="More accurate on a dense mix, about three times slower."
+						description="This is more accurate on a dense mix. It is about three times slower."
 						checked={isolateVocals}
 						onChange={(event) => setIsolateVocals(event.currentTarget.checked)}
 					/>
 					<Switch
 						size="sm"
 						label="Word timestamps"
-						description="Write <mm:ss.xx> tags per word (enhanced LRC) in addition to line tags."
+						description="This writes a <mm:ss.xx> tag for each word (enhanced LRC), and keeps the line tags."
 						checked={wordTimestamps}
 						onChange={(event) => setWordTimestamps(event.currentTarget.checked)}
 					/>

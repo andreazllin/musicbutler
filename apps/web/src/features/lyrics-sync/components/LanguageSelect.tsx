@@ -17,7 +17,7 @@ export const LanguageSelect: FunctionComponent<Props> = ({ value, onChange, isDi
 	const langs = useLanguages();
 	const data = (langs.data?.langs ?? []).map((l) => ({
 		value: l.code,
-		label: l.available ? l.label : `${l.label} — model not installed`,
+		label: l.available ? l.label : `${l.label} (the model is not installed)`,
 		disabled: !l.available,
 	}));
 	return (
@@ -29,7 +29,7 @@ export const LanguageSelect: FunctionComponent<Props> = ({ value, onChange, isDi
 			onChange={(next) => {
 				if (next !== null) onChange(next as Lang);
 			}}
-			placeholder={langs.isPending ? "Loading…" : "Language"}
+			placeholder={langs.isPending ? "Please wait…" : "Language"}
 			allowDeselect={false}
 			checkIconPosition="right"
 			disabled={isDisabled || langs.isPending || langs.isError}

@@ -16,14 +16,14 @@ export const NoSongSelected: FunctionComponent = () => (
 				No song selected
 			</Title>
 			<Text fz="sm" c="dimmed" maw={420}>
-				Pick a song in the library on the left. Its lyrics open here, next to the audio, so you can
-				write them and check the timing by listening.
+				Select a song in the library on the left. The lyrics open here, next to the audio. You can
+				write the lyrics and listen to check the timing.
 			</Text>
 		</Stack>
 		<List fz="sm" c="dimmed" spacing={4} ta="left" maw={420} withPadding>
-			<List.Item>Folders expand in place; nothing loads until you open one.</List.Item>
-			<List.Item>A green badge marks a song that already has an .lrc file.</List.Item>
-			<List.Item>Sync lyrics generates the timestamps from the audio.</List.Item>
+			<List.Item>Search finds a folder or a song at any depth.</List.Item>
+			<List.Item>A green badge shows a song that has an .lrc file.</List.Item>
+			<List.Item>Sync lyrics reads the audio and writes the timestamps.</List.Item>
 		</List>
 	</Stack>
 );

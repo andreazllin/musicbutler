@@ -137,7 +137,7 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 		<Stack gap={0} h="100%" mih={0}>
 			<Box p="sm" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
 				<TextInput
-					aria-label="Filter the library"
+					aria-label="Search the library"
 					placeholder="Search folders and songs"
 					size="sm"
 					leftSection={<IconSearch size={16} />}
@@ -150,14 +150,14 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 					<TreeSkeleton />
 				) : library.isError ? (
 					<SurfaceError
-						title="The library could not be read"
+						title="The app could not read the library"
 						detail={library.error.message}
 						onRetry={() => void library.refetch()}
 					/>
 				) : all.length === 0 ? (
 					<EmptySurface
-						title="Nothing here yet"
-						description="Point MUSIC_DIR at a library that holds audio files. Supported formats include mp3, flac, m4a, ogg and opus."
+						title="The library is empty"
+						description="Set MUSIC_DIR to a folder that holds audio files. The app reads mp3, flac, m4a, ogg and opus files."
 					/>
 				) : nodes.length === 0 ? (
 					<EmptySurface
@@ -169,7 +169,8 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 						{tooManyMatches && (
 							<Alert color="blue" variant="light" icon={<IconSearch size={16} />} mb="xs" p="xs">
 								<Text fz="xs">
-									Showing the first {MAX_FILTER_RESULTS} matches. Type more to narrow them.
+									This list shows the first {MAX_FILTER_RESULTS} matches. Type more characters to
+									narrow the list.
 								</Text>
 							</Alert>
 						)}
@@ -182,8 +183,8 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 								p="xs"
 							>
 								<Text fz="xs">
-									This library is larger than the tree shows. The first{" "}
-									{library.data.count.toLocaleString()} folders and songs are listed.
+									The library is larger than this list. The list shows the first{" "}
+									{library.data.count.toLocaleString()} folders and songs.
 								</Text>
 							</Alert>
 						)}
@@ -258,7 +259,7 @@ function renderNode({
 }
 
 const TreeSkeleton: FunctionComponent = () => (
-	<Stack gap="xs" p={4} aria-busy="true" aria-label="Loading library">
+	<Stack gap="xs" p={4} aria-busy="true" aria-label="The app reads the library">
 		{Array.from({ length: 8 }, (_, i) => (
 			// biome-ignore lint/suspicious/noArrayIndexKey: static skeleton rows
 			<Group key={i} gap="xs" h={32} px="xs" wrap="nowrap">
