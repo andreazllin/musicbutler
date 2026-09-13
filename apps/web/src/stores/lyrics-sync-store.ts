@@ -18,6 +18,8 @@ type LyricsSyncState = {
 	 */
 	expanded: TreeExpandedState;
 	setExpandedState: (state: TreeExpandedState) => void;
+	/** Shuts every folder. The root listing stays open, as it does at the start. */
+	collapseAllFolders: () => void;
 
 	/** Filter box text; narrows the loaded nodes only (docs/PLAN.md §7.3). */
 	treeFilter: string;
@@ -63,6 +65,7 @@ type LyricsSyncState = {
 export const useLyricsSyncStore = create<LyricsSyncState>((set) => ({
 	expanded: { "": true },
 	setExpandedState: (expanded) => set({ expanded }),
+	collapseAllFolders: () => set({ expanded: { "": true } }),
 
 	treeFilter: "",
 	setTreeFilter: (treeFilter) => set({ treeFilter }),

@@ -1,4 +1,5 @@
 import {
+	ActionIcon,
 	Alert,
 	Badge,
 	Box,
@@ -9,6 +10,7 @@ import {
 	Stack,
 	Text,
 	TextInput,
+	Tooltip,
 	Tree,
 	useTree,
 } from "@mantine/core";
@@ -20,6 +22,7 @@ import {
 	IconFileText,
 	IconFolder,
 	IconFolderSearch,
+	IconFoldUp,
 	IconMusic,
 	IconSearch,
 } from "@tabler/icons-react";
@@ -58,6 +61,7 @@ type Props = {
 export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio }) => {
 	const expanded = useLyricsSyncStore((s) => s.expanded);
 	const setExpandedState = useLyricsSyncStore((s) => s.setExpandedState);
+	const collapseAllFolders = useLyricsSyncStore((s) => s.collapseAllFolders);
 	const treeFilter = useLyricsSyncStore((s) => s.treeFilter);
 	const setTreeFilter = useLyricsSyncStore((s) => s.setTreeFilter);
 	const library = useLibraryTree();
@@ -91,6 +95,12 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 			onSelectAudioRef.current(value);
 		}
 	}, []);
+
+	/** The root listing ("") is open from the start, so it does not count. */
+	const anyFolderOpen = useMemo(
+		() => Object.entries(expanded).some(([path, open]) => open && path !== ""),
+		[expanded],
+	);
 
 	const selectedState = useMemo(
 		() => (selectedPath === null ? [] : [selectedPath]),
@@ -136,14 +146,30 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 	return (
 		<Stack gap={0} h="100%" mih={0}>
 			<Box p="sm" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
-				<TextInput
-					aria-label="Search the library"
-					placeholder="Search folders and songs"
-					size="sm"
-					leftSection={<IconSearch size={16} />}
-					value={treeFilter}
-					onChange={(event) => setTreeFilter(event.currentTarget.value)}
-				/>
+				<Group gap="xs" wrap="nowrap">
+					<TextInput
+						flex={1}
+						aria-label="Search the library"
+						placeholder="Search folders and songs"
+						size="sm"
+						leftSection={<IconSearch size={16} />}
+						value={treeFilter}
+						onChange={(event) => setTreeFilter(event.currentTarget.value)}
+					/>
+					{/* A deep library opens many folders on the way to one song. This
+					    puts the tree back to the top in one action. */}
+					<Tooltip label="Close all folders" withArrow>
+						<ActionIcon
+							variant="default"
+							size="input-sm"
+							aria-label="Close all folders"
+							disabled={!anyFolderOpen}
+							onClick={collapseAllFolders}
+						>
+							<IconFoldUp size={16} />
+						</ActionIcon>
+					</Tooltip>
+				</Group>
 			</Box>
 			<Box flex={1} mih={0} p="xs" style={{ overflow: "auto" }}>
 				{library.isPending ? (
