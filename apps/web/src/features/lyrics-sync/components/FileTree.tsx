@@ -105,18 +105,22 @@ export const FileTree: FunctionComponent<Props> = ({ selectedPath, onSelectAudio
 		[selectedPath],
 	);
 
-	const onSelect = useCallback(
-		(values: string[]) => {
-			const value = values.at(-1);
-			// Directories expand on click; only audio rows change the selection. The
-			// extension is checked too, so a directory the ref has not seen yet can
-			// never reach `lrc.get`, which rejects anything that is not an audio file.
-			if (value !== undefined && !dirPaths.current.has(value) && isAudioFile(value)) {
-				onSelectAudio(value);
-			}
-		},
-		[onSelectAudio],
-	);
+	// `useTree` keeps the callbacks it was given on the first render, so the
+	// handler is read from a ref. Passing it directly froze the caller's
+	// unsaved-changes check at its first value, and switching songs from the tree
+	// discarded unsaved edits without asking.
+	const onSelectAudioRef = useRef(onSelectAudio);
+	onSelectAudioRef.current = onSelectAudio;
+
+	const onSelect = useCallback((values: string[]) => {
+		const value = values.at(-1);
+		// Directories expand on click; only audio rows change the selection. The
+		// extension is checked too, so a directory the ref has not seen yet can
+		// never reach `lrc.get`, which rejects anything that is not an audio file.
+		if (value !== undefined && !dirPaths.current.has(value) && isAudioFile(value)) {
+			onSelectAudioRef.current(value);
+		}
+	}, []);
 
 	const tree = useTree({
 		expandedState: expanded,

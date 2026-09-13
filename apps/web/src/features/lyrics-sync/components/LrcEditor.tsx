@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { lintKeymap } from "@codemirror/lint";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Transaction } from "@codemirror/state";
 import {
 	placeholder as cmPlaceholder,
 	drawSelection,
@@ -20,6 +20,7 @@ import {
 } from "react";
 import { lrcLanguage } from "../editor/lrc-language";
 import { lrcLinter } from "../editor/lrc-lint";
+import { isProgrammatic, programmatic } from "../editor/programmatic";
 import { lrcEditorTheme } from "../editor/theme";
 import classes from "./LrcEditor.module.css";
 
@@ -93,7 +94,9 @@ export const LrcEditor: FunctionComponent<Props> = ({
 				placeholderRef.current.of(placeholder ? cmPlaceholder(placeholder) : []),
 				keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, ...lintKeymap]),
 				EditorView.updateListener.of((update) => {
-					if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+					if (update.docChanged && !isProgrammatic(update)) {
+						onChangeRef.current(update.state.doc.toString());
+					}
 				}),
 			],
 		});
@@ -113,8 +116,11 @@ export const LrcEditor: FunctionComponent<Props> = ({
 		if (current === value) return;
 		view.dispatch({
 			changes: { from: 0, to: current.length, insert: value },
-			// A fresh document should not be undoable back into the previous song's text.
-			annotations: [],
+			annotations: [
+				programmatic.of(true),
+				// A fresh document must not be undoable back into the previous song's text.
+				Transaction.addToHistory.of(false),
+			],
 		});
 	}, [value]);
 
@@ -148,6 +154,9 @@ export const LrcEditor: FunctionComponent<Props> = ({
 					changes: { from: 0, to: view.state.doc.length, insert: text },
 					selection: { anchor: Math.min(view.state.selection.main.anchor, text.length) },
 					userEvent: "input.replace",
+					// Stays in the undo history, but the callers update the buffer
+					// themselves, so it must not come back as an edit.
+					annotations: programmatic.of(true),
 				});
 			},
 			focus: () => viewRef.current?.focus(),
