@@ -1,4 +1,5 @@
-import { Box, Button, Code, Flex, Group, Paper, Stack, Text } from "@mantine/core";
+import { Box, Button, Code, Drawer, Flex, Group, Paper, Stack, Text } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { shiftTimestamps } from "@musicbutler/lrc";
 import type { Lang } from "@musicbutler/shared";
 import { IconDeviceFloppy, IconDownload, IconTrash } from "@tabler/icons-react";
@@ -36,6 +37,12 @@ const TREE_MIN = 220;
 const TREE_MAX = 640;
 
 /**
+ * Below this the library cannot sit beside the editor: 320 px of tree plus an
+ * editor does not fit on a phone. It becomes a drawer instead.
+ */
+const NARROW = "(max-width: 768px)";
+
+/**
  * The Lyrics Sync screen (docs/PLAN.md §7.3): the library tree on the left, the
  * editor, the sync checker and the action row on the right. Server data lives in
  * TanStack Query, the selected song in the URL, everything else in the store.
@@ -69,6 +76,9 @@ export const LyricsSyncPage: FunctionComponent = () => {
 	const [duration, setDuration] = useState<number | undefined>(undefined);
 	const [lang, setLang] = useState<Lang | null>(null);
 	const [importOpen, setImportOpen] = useState(false);
+	// `useMediaQuery` is undefined on the first render, before it can measure.
+	const isNarrow = useMediaQuery(NARROW) ?? false;
+	const [libraryOpen, setLibraryOpen] = useState(false);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 	const editorRef = useRef<LrcEditorHandle | null>(null);
 
@@ -122,6 +132,9 @@ export const LyricsSyncPage: FunctionComponent = () => {
 		clearBuffer();
 		setPreviewOffset(0);
 		void setSong(path);
+		// On a narrow screen the library covers the editor, so close it once the
+		// choice is made.
+		setLibraryOpen(false);
 	};
 	/** Applies the unsaved-changes guard. `null` clears the selection. */
 	const requestSelect = (path: string | null) => {
@@ -197,24 +210,41 @@ export const LyricsSyncPage: FunctionComponent = () => {
 
 	return (
 		<Flex h="100%" w="100%" mih={0}>
-			<Box
-				component="aside"
-				w={treeWidth}
-				h="100%"
-				style={{
-					flexShrink: 0,
-					borderRight: "1px solid var(--mantine-color-default-border)",
-				}}
-			>
-				<FileTree selectedPath={song} onSelectAudio={requestSelect} />
-			</Box>
-			<ColumnResizer
-				width={treeWidth}
-				min={TREE_MIN}
-				max={TREE_MAX}
-				onChange={setTreeWidth}
-				label="Resize library column"
-			/>
+			{isNarrow ? (
+				<Drawer
+					opened={libraryOpen}
+					onClose={() => setLibraryOpen(false)}
+					title="Library"
+					position="left"
+					size="85%"
+					padding={0}
+					styles={{ body: { height: "calc(100% - 60px)", padding: 0 } }}
+				>
+					<FileTree selectedPath={song} onSelectAudio={requestSelect} />
+				</Drawer>
+			) : (
+				<>
+					<Box
+						component="aside"
+						w={treeWidth}
+						h="100%"
+						style={{
+							flexShrink: 0,
+							borderRight: "1px solid var(--mantine-color-default-border)",
+						}}
+					>
+						<FileTree selectedPath={song} onSelectAudio={requestSelect} />
+					</Box>
+					{/* The resizer is a pointer drag, which a touch screen has no use for. */}
+					<ColumnResizer
+						width={treeWidth}
+						min={TREE_MIN}
+						max={TREE_MAX}
+						onChange={setTreeWidth}
+						label="Resize library column"
+					/>
+				</>
+			)}
 
 			<Flex component="section" direction="column" flex={1} miw={0}>
 				<EditorHeader
@@ -222,18 +252,40 @@ export const LyricsSyncPage: FunctionComponent = () => {
 					dirty={dirty}
 					lrcExists={lrc.data?.exists}
 					onClear={() => requestSelect(null)}
+					onOpenLibrary={isNarrow ? () => setLibraryOpen(true) : undefined}
 				/>
 
 				{!songSelected ? (
 					<NoSongSelected />
 				) : (
-					<Stack gap="sm" flex={1} mih={0} p="md">
+					<Stack
+						gap="sm"
+						flex={1}
+						mih={0}
+						p="md"
+						style={isNarrow ? { overflowY: "auto" } : undefined}
+					>
 						{lrc.isError ? (
 							<SurfaceError
 								title="The app could not read the lyrics file"
 								detail={lrc.error.message}
 								onRetry={() => void lrc.refetch()}
 							/>
+						) : isNarrow ? (
+							// A flex child in a scrolling column collapses to nothing, so the
+							// editor is given a height of its own here.
+							<Box mih={240} style={{ display: "flex", flexDirection: "column" }}>
+								<LrcEditor
+									handleRef={editorRef}
+									value={editorText}
+									onChange={(text) => {
+										if (song) setBuffer(song, text);
+									}}
+									disabled={lrc.isPending || sync.isRunning}
+									durationSeconds={duration}
+									placeholder="Type or paste the lyrics here. Then select Sync lyrics to make the timestamps."
+								/>
+							</Box>
 						) : (
 							<LrcEditor
 								handleRef={editorRef}
@@ -250,7 +302,7 @@ export const LyricsSyncPage: FunctionComponent = () => {
 						{/* The card does not clip. The slider labels of the player sit above
 						    their thumbs, and the card's own top edge used to cut them in half.
 						    Only the preview below needs clipping, so only it clips. */}
-						<Paper withBorder h="38%" mih={224}>
+						<Paper withBorder h={isNarrow ? undefined : "38%"} mih={isNarrow ? 260 : 224}>
 							<Stack gap={0} h="100%">
 								<Box style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
 									<AudioPlayer

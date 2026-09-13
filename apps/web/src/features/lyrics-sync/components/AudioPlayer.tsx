@@ -141,7 +141,10 @@ export const AudioPlayer: FunctionComponent<Props> = ({ src, audioRef, onDuratio
 			px="sm"
 			py={8}
 		>
-			<Group gap="md" wrap="nowrap">
+			{/* Wraps on a narrow screen. The seek row keeps the full width and the
+			    volume and the speed drop to a second line, rather than the whole
+			    row overflowing the card. */}
+			<Group gap="md" wrap="wrap">
 				{/* biome-ignore lint/a11y/useMediaCaption: music has no captions; the lyric preview is the transcript */}
 				<audio ref={audioRef} src={src ?? undefined} preload="metadata" />
 				<Tooltip label={playing ? "Pause (Space)" : "Play (Space)"} withArrow>
@@ -155,10 +158,10 @@ export const AudioPlayer: FunctionComponent<Props> = ({ src, audioRef, onDuratio
 						{playing ? <IconPlayerPauseFilled size={18} /> : <IconPlayerPlayFilled size={18} />}
 					</ActionIcon>
 				</Tooltip>
-				<Text fz="xs" ff="monospace" c="dimmed" w={120} style={{ flexShrink: 0 }}>
+				<Text fz="xs" ff="monospace" c="dimmed" w={120} style={{ flexShrink: 0 }} visibleFrom="xs">
 					{formatClock(time)} / {duration === undefined ? "--:--.--" : formatClock(duration)}
 				</Text>
-				<Box flex={1} miw={160}>
+				<Box flex={1} miw={140}>
 					<Slider
 						label={formatClock}
 						thumbLabel="Seek"
@@ -171,7 +174,7 @@ export const AudioPlayer: FunctionComponent<Props> = ({ src, audioRef, onDuratio
 						size="sm"
 					/>
 				</Box>
-				<Group gap="xs" wrap="nowrap" w={150}>
+				<Group gap="xs" wrap="nowrap" w={150} flex={{ base: 1, sm: "0 0 auto" }}>
 					<ActionIcon
 						size="md"
 						variant="subtle"
@@ -196,6 +199,7 @@ export const AudioPlayer: FunctionComponent<Props> = ({ src, audioRef, onDuratio
 				</Group>
 				<SegmentedControl
 					aria-label="Playback speed"
+					visibleFrom="xs"
 					size="xs"
 					value={String(playbackRate)}
 					onChange={(value) => setPlaybackRate(Number(value))}

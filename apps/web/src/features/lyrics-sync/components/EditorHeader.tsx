@@ -1,5 +1,6 @@
-import { Badge, Box, CloseButton, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, CloseButton, Group, Text, Tooltip } from "@mantine/core";
 import { lrcPathFor } from "@musicbutler/shared";
+import { IconMenu2 } from "@tabler/icons-react";
 import type { FunctionComponent } from "react";
 import { baseNameOf } from "../helpers/paths";
 
@@ -9,10 +10,18 @@ type Props = {
 	lrcExists: boolean | undefined;
 	/** Clears the selection. The caller applies the unsaved-changes guard. */
 	onClear: () => void;
+	/** Opens the library. Set only when the library is a drawer, on a narrow screen. */
+	onOpenLibrary?: (() => void) | undefined;
 };
 
 /** Song file name, the resolved `.lrc` path and the dirty indicator (docs/PLAN.md §7.3). */
-export const EditorHeader: FunctionComponent<Props> = ({ songPath, dirty, lrcExists, onClear }) => (
+export const EditorHeader: FunctionComponent<Props> = ({
+	songPath,
+	dirty,
+	lrcExists,
+	onClear,
+	onOpenLibrary,
+}) => (
 	<Group
 		component="header"
 		mih={48}
@@ -22,6 +31,18 @@ export const EditorHeader: FunctionComponent<Props> = ({ songPath, dirty, lrcExi
 		py="xs"
 		style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
 	>
+		{onOpenLibrary !== undefined && (
+			<Tooltip label="Open the library" withArrow>
+				<ActionIcon
+					variant="default"
+					aria-label="Open the library"
+					onClick={onOpenLibrary}
+					style={{ flexShrink: 0 }}
+				>
+					<IconMenu2 size={18} />
+				</ActionIcon>
+			</Tooltip>
+		)}
 		{songPath === null ? (
 			<Text fz="sm" c="dimmed">
 				Select a song from the library to edit its lyrics.
@@ -37,15 +58,15 @@ export const EditorHeader: FunctionComponent<Props> = ({ songPath, dirty, lrcExi
 					</Text>
 				</Box>
 				{dirty ? (
-					<Badge color="yellow" variant="light" size="sm">
+					<Badge color="yellow" variant="light" size="sm" visibleFrom="xs">
 						Unsaved changes
 					</Badge>
 				) : lrcExists ? (
-					<Badge color="teal" variant="light" size="sm">
+					<Badge color="teal" variant="light" size="sm" visibleFrom="xs">
 						Saved
 					</Badge>
 				) : (
-					<Badge color="gray" variant="light" size="sm">
+					<Badge color="gray" variant="light" size="sm" visibleFrom="xs">
 						No .lrc file
 					</Badge>
 				)}

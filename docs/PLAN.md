@@ -934,11 +934,14 @@ package to Public.
 
 The app holds no in-app authentication and no user accounts. It edits no
 metadata, no tags, and no artwork. It calls no Navidrome API and reads no
-Navidrome database. It fetches no lyrics from an external provider, because the
-user supplies the words. It runs no speech-to-text transcription, because it
-only aligns. It offers no library-wide batch sync. It supports no concurrency
-beyond the mtime check. It has no mobile layout, because the target is the
-desktop. Do not break at narrow widths, but do not design for them either.
+Navidrome database. It runs no speech-to-text transcription, because it only
+aligns. It offers no library-wide batch sync: jobs are queued one song at a
+time. It supports no concurrency beyond the mtime check.
+
+The target is the desktop, and the two-column layout is drawn for it. The app
+also has to stay usable on a narrow screen: below 768 px the library becomes a
+drawer, the column resizer goes, and the player controls wrap. That is a fall
+back, not a second design.
 
 The project publishes to no second registry and to no Docker Hub. It uses no
 paid registry and no paid hosting. It ships no image that needs a login to pull.
