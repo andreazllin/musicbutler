@@ -164,6 +164,35 @@ export const LANG_LABELS: Record<Lang, string> = {
 	"it-IT": "Italiano",
 };
 
+/**
+ * Where a lyrics sync runs. `browser` runs the models in the page that asked
+ * for the sync, so the server only serves the audio and saves the result.
+ */
+export const SYNC_MODES = ["browser", "server"] as const;
+export type SyncMode = (typeof SYNC_MODES)[number];
+
+/**
+ * A model a browser can download from the server: the vocal separation model,
+ * or the acoustic model of one language. The id is also the first segment of
+ * its URL, `/models/<id>/<file>`.
+ */
+export type BrowserModelId = "separation" | Lang;
+
+export type BrowserModel = {
+	id: BrowserModelId;
+	/** Every file of the model, relative to `/models/<id>/`. */
+	files: { name: string; bytes: number }[];
+	/** Sum of the file sizes. */
+	bytes: number;
+	/** True when the server holds every file, so a browser can download it. */
+	available: boolean;
+	/**
+	 * Changes when any file on the server changes. A browser copy with another
+	 * version is out of date.
+	 */
+	version: string;
+};
+
 /** Stages of one sync job, in the order they run (docs/PLAN.md §6.2). */
 export const SYNC_STAGES = [
 	"queued",

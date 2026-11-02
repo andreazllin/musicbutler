@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { getEnv } from "./env.ts";
 import { isDirectorySync, isWritableDir } from "./fs/library.ts";
+import { modelFileHandler } from "./http/models.ts";
 import { streamHandler } from "./http/stream.ts";
 import { log } from "./log.ts";
 import { modelsReady } from "./models.ts";
@@ -28,9 +29,19 @@ export interface CreateAppOptions {
 export function createApp(opts: CreateAppOptions = {}): Hono {
 	const app = new Hono();
 
+	// Cross-origin isolation gives the page SharedArrayBuffer, which the browser
+	// sync needs to run ONNX on more than one thread. `credentialless` rather
+	// than `require-corp`, so the cross-origin font in index.html still loads.
+	app.use("*", async (c, next) => {
+		await next();
+		c.res.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+		c.res.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+	});
+
 	app.use("/trpc/*", trpcServer({ router: appRouter, endpoint: "/trpc" }));
 
 	app.get("/media/stream", streamHandler);
+	app.on(["GET", "HEAD"], "/models/*", modelFileHandler);
 
 	app.get("/healthz", async (c) => {
 		const env = getEnv();

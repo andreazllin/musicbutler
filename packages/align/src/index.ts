@@ -25,7 +25,7 @@
  * needs about 70 MB more for a 4-minute song (trellis, §7.8) plus the decoded
  * audio (~85 MB for 4 min of stereo float32).
  */
-import { basename, extname, join } from "node:path";
+import { basename, extname, isAbsolute, join } from "node:path";
 import { LANGS as LANG_CODES, type Lang } from "@musicbutler/shared";
 import { forcedAlign } from "./align/index.ts";
 import { asrModelFiles, asrModelReady, Wav2Vec2Emitter } from "./asr/wav2vec2.ts";
@@ -353,4 +353,41 @@ export async function availableLangs(
 			available: MODELS.asr[code] !== "" && (await modelsReady(code, dtype)),
 		})),
 	);
+}
+
+/** One model file: the name a client asks for it by, and where it sits on disk. */
+export interface ModelFileLocation {
+	/** Relative to the model, for example `onnx/model_quantized.onnx`. */
+	name: string;
+	/** Absolute path on this host. */
+	path: string;
+}
+
+/**
+ * Every file of every model, by the name a browser asks for it
+ * (docs/DECISIONS.md, 2026-11-02). The server serves exactly this list and
+ * nothing else, so a request can never name a path of its own. A language
+ * without a configured model maps to null. `cacheDir` defaults to `CACHE_DIR`.
+ */
+export function modelFileLocations(
+	cacheDir: string = CACHE_DIR,
+	dtype: Dtype = "q8",
+): {
+	separation: ModelFileLocation[];
+	asr: Record<Lang, ModelFileLocation[] | null>;
+} {
+	const asr = {} as Record<Lang, ModelFileLocation[] | null>;
+	for (const code of LANG_CODES) {
+		const modelId = MODELS.asr[code];
+		if (!modelId) {
+			asr[code] = null;
+			continue;
+		}
+		const dir = isAbsolute(modelId) ? modelId : join(cacheDir, "transformers", modelId);
+		asr[code] = asrModelFiles(dtype).map((name) => ({ name, path: join(dir, name) }));
+	}
+	return {
+		separation: [{ name: MODELS.demucs.file, path: join(cacheDir, MODELS.demucs.file) }],
+		asr,
+	};
 }
