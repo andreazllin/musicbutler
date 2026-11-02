@@ -64,13 +64,86 @@ docker compose pull && docker compose up -d
   confirm the behavior before you point it at the real library.
 - **Navidrome must be able to read the written files.** Set `PUID` and `PGID`
   to the owner of the library (`id -u`, `id -g` on the host). Files are written
-  with mode `0644`.
+  with mode `0644`. Other tools that add music must use the same owner. See
+  [Permissions for new music](#permissions-for-new-music).
 - **Navidrome picks up external `.lrc` files during a scan.** A new file may
   not appear in a client until the next scan. v1 does not call the Navidrome API.
 - **The app has no login.** The published compose file binds to `127.0.0.1`
   only. To expose it wider, uncomment the `caddy` service in the compose file,
   which adds HTTP basic auth in front of the container. Never publish port 3000
   on `0.0.0.0` without it.
+
+## Permissions for new music
+
+The app writes a `.lrc` in two steps. First it creates a temporary file in the
+folder of the song. Then it renames that file over the `.lrc`. So the server
+needs write permission on the folder, not only on the file.
+
+Another tool often adds the music, for example Lidarr, beets, a download client
+or a copy over SMB. When that tool runs as a different user, the new folders
+belong to that user. The app can often still read and play those songs, but it
+cannot write in their folders. A sync or a save then fails with `EACCES` or with
+"The server refused this path."
+
+To find the cause, compare the owner of a folder that fails with your `PUID`
+and `PGID`:
+
+```bash
+ls -ldn "/path/to/your/music/Artist/Album"
+```
+
+To test a write as the server user, give `exec` your `PUID` and `PGID`. Without
+`-u`, `exec` runs as root and the test always passes. The examples use `1000`,
+the default. Use your own values.
+
+```bash
+docker compose exec -u 1000:1000 musicbutler \
+  sh -c 'touch "/music/Artist/Album/.write-test" && rm "/music/Artist/Album/.write-test"'
+```
+
+### One owner for the library (recommended)
+
+Run every tool that writes to the library as one user. Most images, including
+the linuxserver.io images and Lidarr, accept `PUID`, `PGID` and `UMASK`. Give
+each tool the same values as musicbutler:
+
+```yaml
+# In the compose file of the tool that adds music
+environment:
+  PUID: "1000"
+  PGID: "1000"
+  UMASK: "022"
+```
+
+Then give the folders that exist to that user. Do this one time:
+
+```bash
+sudo chown -R 1000:1000 /path/to/your/music
+```
+
+### One group for the library
+
+Use this when the tools must run as different users. Each tool keeps its user,
+and all of them write through one group.
+
+1. Make a group on the host, for example `media`. Add the users of the other
+   tools to it.
+2. Give the library to that group and give the group write permission:
+
+   ```bash
+   sudo chgrp -R media /path/to/your/music
+   sudo chmod -R g+rwX /path/to/your/music
+   sudo find /path/to/your/music -type d -exec chmod g+s {} +
+   ```
+
+   The `g+s` bit on a folder gives each new folder in it the same group.
+3. Set `UMASK` to `002` on every other tool, so the new folders keep group
+   write permission.
+4. Set `PGID` in the `.env` of musicbutler to the id of the group
+   (`getent group media`). Then run `docker compose up -d`.
+
+The server runs with its `PGID` group only. It does not get the other groups of
+the host user. So the group of each folder must be the `PGID` group.
 
 ## Languages
 
