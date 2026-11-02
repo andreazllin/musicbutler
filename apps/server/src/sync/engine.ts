@@ -11,13 +11,7 @@
  * The engine is imported lazily so that `getEnv()` has exported
  * `MUSICBUTLER_CACHE` before `packages/align` reads it (§13.14).
  */
-import {
-	type Line,
-	type LrcDocument,
-	parse,
-	serialize,
-	stripToPlainLyrics,
-} from "@musicbutler/lrc";
+import { buildAlignedDocument, serialize, stripToPlainLyrics } from "@musicbutler/lrc";
 import { LANG_LABELS, type Lang, type SyncEvent, type SyncStage } from "@musicbutler/shared";
 import { getEnv } from "../env.ts";
 import { writeLrcAtomic } from "../fs/library.ts";
@@ -183,37 +177,5 @@ async function run(job: Job, input: SyncJobInput): Promise<void> {
 	}
 }
 
-type AlignedWord = { text: string; start: number; end: number; line: number };
-
-/**
- * The write stage (docs/PLAN.md §8.2 rule 2): one timed line per source line
- * that holds words, line time = first word start minus leadIn (clamped at 0),
- * optional `<mm:ss.xx>` word tags, metadata from the editor text preserved.
- */
-export function buildDocument(
-	editorText: string,
-	lines: string[],
-	words: AlignedWord[],
-	opts: { leadIn: number; wordTimestamps: boolean },
-): LrcDocument {
-	const byLine = new Map<number, AlignedWord[]>();
-	for (const w of words) {
-		const list = byLine.get(w.line);
-		if (list) list.push(w);
-		else byLine.set(w.line, [w]);
-	}
-	const shift = (t: number) => Math.max(0, t - opts.leadIn);
-	const timed: Line[] = [];
-	for (const [index, lineWords] of [...byLine.entries()].sort((a, b) => a[0] - b[0])) {
-		const first = lineWords[0];
-		if (!first) continue;
-		const line: Line = {
-			time: shift(first.start),
-			text: lines[index] ?? lineWords.map((w) => w.text).join(" "),
-		};
-		if (opts.wordTimestamps)
-			line.words = lineWords.map((w) => ({ time: shift(w.start), text: w.text }));
-		timed.push(line);
-	}
-	return { meta: parse(editorText).meta, lines: timed };
-}
+/** The write stage now lives in `@musicbutler/lrc`, shared with the browser sync. */
+export const buildDocument = buildAlignedDocument;

@@ -3,6 +3,11 @@
  * (docs/PLAN.md §5.6, §7.4, §7.5, §7.6, §8.2). Pure TypeScript, zero
  * dependencies, no DOM: runs in Bun and in the browser.
  */
+export {
+	type AlignedDocumentOptions,
+	type AlignedWord,
+	buildAlignedDocument,
+} from "./aligned.ts";
 export { hasTimestamps } from "./detect.ts";
 export { parse } from "./parse.ts";
 export { serialize } from "./serialize.ts";
