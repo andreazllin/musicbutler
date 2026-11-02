@@ -1,7 +1,7 @@
 /**
  * Path -> character segments -> words (docs/lyrics-sync-functionality-implementation-plan.md §5.9).
  */
-import { ASR_FRAME_SEC } from "../config.ts";
+import { ASR_FRAME_SEC } from "../constants.ts";
 import type { CharSegment, PathPoint, SourceWord, Tokenized, Word } from "../types.ts";
 
 /** Collapses runs with the same tokenIndex; score = mean of the run. */

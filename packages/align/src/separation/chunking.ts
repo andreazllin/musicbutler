@@ -3,7 +3,7 @@
  * reference infer.py (docs/lyrics-sync-functionality-implementation-plan.md §5.3,
  * docs/PLAN.md §13.10 and §13.11).
  */
-import { DEMUCS_OVERLAP, DEMUCS_SEGMENT_SAMPLES } from "../config.ts";
+import { DEMUCS_OVERLAP, DEMUCS_SEGMENT_SAMPLES } from "../constants.ts";
 
 /**
  * Ones with a linear fade-in over the first `overlap` samples and a linear
