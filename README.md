@@ -194,6 +194,30 @@ The alignment runs on a worker thread, so the app stays usable while a job
 runs. You can edit a different song, start more jobs or move around the library.
 A job blocks only the song it aligns.
 
+## Where a sync runs
+
+A sync runs in your browser by default. The browser runs the same models as the
+server, so the server only sends the audio and saves the `.lrc` file. Many
+people can sync at the same time and the server stays responsive. Change the
+setting on the **Settings** screen (the gear icon in the sidebar).
+
+- **This browser**: the first sync asks to download the models from your
+  server: about 160 MB for vocal isolation and one speech model per language.
+  The browser keeps them in IndexedDB. The Settings screen shows each model,
+  downloads it ahead of time, and deletes it to give the space back. The
+  server serves only the models it holds, so a language must be installed on
+  the server (see [Languages](#languages)).
+- **Server**: the server runs the models, one job at a time for all users.
+
+A sync in the browser is slower than on a strong server. Over plain HTTP the
+browser gives the page one processor core only. Over HTTPS (or on `localhost`)
+the server sends cross-origin isolation headers and the sync uses several
+cores. A browser cannot decode every format that `ffmpeg` reads (for example
+WMA, APE or DSF). For those songs, set the sync to run on the server.
+
+A sync in the browser stops when you close or reload the tab. The Settings
+screen also sets the language that the Lyrics Sync screen selects first.
+
 ## The sync queue
 
 Start a sync and the job joins a queue. The server runs one job at a time,
@@ -204,6 +228,9 @@ job that still waits. The sidebar shows a count while jobs are active.
 
 Two jobs on one song are refused. They would write the same `.lrc` file at the
 same time.
+
+A sync in the browser has a queue of its own, one job at a time. Its jobs show
+on the same screen, marked "This browser".
 
 ## Import lyrics
 
