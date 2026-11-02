@@ -23,8 +23,6 @@ import {
 	type Vocab,
 } from "@musicbutler/align/browser";
 import type { BrowserModel, Lang } from "@musicbutler/shared";
-import wasmAsyncifyMjs from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
-import wasmAsyncify from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import wasmPlainMjs from "onnxruntime-web/ort-wasm-simd-threaded.mjs?url";
 import wasmPlain from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
 import * as ort from "onnxruntime-web/webgpu";
@@ -36,11 +34,14 @@ declare const self: DedicatedWorkerGlobalScope;
 
 // Serve the ONNX runtime from this app, not from a CDN. Transformers.js only
 // sets its CDN paths when none are set, so this has to run before it loads.
-// Safari gets the plain build, as Transformers.js itself chooses.
-const isSafari = /^((?!chrome|android).)*safari/i.test(self.navigator.userAgent);
-ort.env.wasm.wasmPaths = isSafari
-	? { mjs: wasmPlainMjs, wasm: wasmPlain }
-	: { mjs: wasmAsyncifyMjs, wasm: wasmAsyncify };
+//
+// The plain build in every browser, never the asyncify build that
+// Transformers.js picks outside Safari. The asyncify build has no float64
+// kernels, and the inverse STFT at the end of Demucs adds its frames in
+// float64: the session fails with "Could not find an implementation for
+// ConstantOfShape(9)". Both models run on the CPU here, so nothing needs the
+// WebGPU support that the asyncify build adds.
+ort.env.wasm.wasmPaths = { mjs: wasmPlainMjs, wasm: wasmPlain };
 // More than one thread needs SharedArrayBuffer, which needs cross-origin
 // isolation. Leave one core to the page.
 ort.env.wasm.numThreads = self.crossOriginIsolated
@@ -69,7 +70,9 @@ async function loadDemucs(model: BrowserModel): Promise<Demucs> {
 	if (!file) throw new Error("The server lists no file for vocal isolation.");
 	const session = await ort.InferenceSession.create(await blobBytes(model, file.name), {
 		executionProviders: ["wasm"],
-		graphOptimizationLevel: "all",
+		// The graph holds about 30,000 nodes, and the optimizer runs the
+		// WebAssembly heap out of memory (std::bad_alloc) at any level above this.
+		graphOptimizationLevel: "disabled",
 	});
 	const inputName = session.inputNames[0] ?? "mix";
 	const outputName = session.outputNames[0] ?? "stems";
