@@ -40,4 +40,7 @@ export const TOOLS = [
 
 export type ToolPath = (typeof TOOLS)[number]["path"];
 
+/** Route of the Settings screen. The sidebar draws it apart from the tools. */
+export const SETTINGS_PATH = "/settings";
+
 export const DEFAULT_TOOL_PATH: ToolPath = TOOLS[0].path;

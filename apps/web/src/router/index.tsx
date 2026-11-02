@@ -5,7 +5,8 @@ import {
 	Outlet,
 	redirect,
 } from "@tanstack/react-router";
-import { DEFAULT_TOOL_PATH, TOOLS } from "@/features/registry";
+import { lazy } from "react";
+import { DEFAULT_TOOL_PATH, SETTINGS_PATH, TOOLS } from "@/features/registry";
 import { AppShell } from "@/layouts/app-shell";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { RouteProviders } from "./providers";
@@ -38,7 +39,18 @@ const toolRoutes = TOOLS.map((tool) =>
 	}),
 );
 
-const routeTree = rootRoute.addChildren([indexRoute, ...toolRoutes]);
+const SettingsPage = lazy(() =>
+	import("@/pages/settings-page").then((m) => ({ default: m.SettingsPage })),
+);
+
+/** Settings is not a tool, so it sits beside the registry rather than in it. */
+const settingsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: SETTINGS_PATH,
+	component: SettingsPage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, ...toolRoutes, settingsRoute]);
 
 export const router = createRouter({
 	routeTree,

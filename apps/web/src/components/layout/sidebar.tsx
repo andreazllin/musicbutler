@@ -1,10 +1,10 @@
 import { ActionIcon, Anchor, Center, Indicator, Stack, Tooltip } from "@mantine/core";
-import { IconBrandGithub } from "@tabler/icons-react";
+import { IconBrandGithub, IconSettings } from "@tabler/icons-react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { FunctionComponent } from "react";
 import { activeCount } from "@/features/jobs/helpers/queue";
-import { useJobs } from "@/features/jobs/hooks/use-jobs";
-import { TOOLS } from "@/features/registry";
+import { useAllJobs } from "@/features/jobs/hooks/use-all-jobs";
+import { SETTINGS_PATH, TOOLS } from "@/features/registry";
 import { SOURCE_URL } from "@/lib/source";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -27,7 +27,7 @@ export const Sidebar: FunctionComponent = () => {
     const navigate = useNavigate();
     // The badge is the only thing that says a job is running while you work on
     // a different screen.
-    const { jobs } = useJobs();
+    const { jobs } = useAllJobs();
     const active = activeCount(jobs);
     return (
         <Stack
@@ -78,6 +78,18 @@ export const Sidebar: FunctionComponent = () => {
                 })}
             </Stack>
             <Stack gap="xs" mt="auto" align="center">
+                <Tooltip label="Settings" position="right" withArrow>
+                    <ActionIcon
+                        size="lg"
+                        variant={pathname.startsWith(SETTINGS_PATH) ? "light" : "subtle"}
+                        color={pathname.startsWith(SETTINGS_PATH) ? undefined : "gray"}
+                        aria-label="Settings"
+                        aria-current={pathname.startsWith(SETTINGS_PATH) ? "page" : undefined}
+                        onClick={() => void navigate({ to: SETTINGS_PATH })}
+                    >
+                        <IconSettings size={20} />
+                    </ActionIcon>
+                </Tooltip>
                 <SourceLink />
                 <ThemeToggle />
             </Stack>

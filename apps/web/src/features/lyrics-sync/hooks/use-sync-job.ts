@@ -1,18 +1,22 @@
-import type { SyncEvent, SyncStage } from "@musicbutler/shared";
+import type { BrowserModel, Lang, SyncEvent } from "@musicbutler/shared";
 import { useMutation } from "@tanstack/react-query";
 import { useSubscription } from "@trpc/tanstack-react-query";
 import { useCallback, useEffect, useState } from "react";
+import { useBrowserModels } from "@/features/browser-sync/hooks/use-browser-models";
+import { useBrowserSyncJob } from "@/features/browser-sync/hooks/use-browser-sync-job";
 import { activeJobFor } from "@/features/jobs/helpers/queue";
 import { useJobs } from "@/features/jobs/hooks/use-jobs";
 import { notify } from "@/lib/notify";
 import { useTRPC } from "@/lib/trpc";
+import { useSettingsStore } from "@/stores/settings-store";
+import type { SyncProgressStage } from "../constants";
 
-export type SyncProgressState = { stage: SyncStage; pct: number; message?: string };
+export type SyncProgressState = { stage: SyncProgressStage; pct: number; message?: string };
 
 type StartInput = {
 	audioPath: string;
 	lyrics: string;
-	lang: "en-US" | "it-IT";
+	lang: Lang;
 	options?: { isolateVocals?: boolean; leadInMs?: number; wordTimestamps?: boolean };
 };
 
@@ -24,7 +28,61 @@ type Handlers = {
 };
 
 /**
- * Follows the sync job of one song (docs/PLAN.md §6.2 `sync.*`, §7.5).
+ * Follows the sync job of one song, wherever it runs. The Settings screen
+ * picks where a new job runs. A job that already runs is followed to the end
+ * in the place it started, even when the setting changes in between.
+ *
+ * In browser mode, `missingModels` lists what this browser must download
+ * before the sync can run. The caller asks the user first, because the models
+ * are hundreds of megabytes. The job then downloads them as its first stage.
+ */
+export function useSyncJob(handlers: Handlers) {
+	const mode = useSettingsStore((s) => s.syncMode);
+	const server = useServerSyncJob(handlers);
+	const browser = useBrowserSyncJob(handlers);
+	const models = useBrowserModels();
+
+	return {
+		mode,
+		isRunning: server.isRunning || browser.isRunning,
+		progress: browser.progress ?? server.progress,
+		/** In browser mode, the models to download before `start`. Empty in server mode. */
+		missingModels: (lang: Lang, isolateVocals: boolean): BrowserModel[] =>
+			mode === "browser" ? models.missingFor(lang, isolateVocals) : [],
+		start: (input: StartInput) => {
+			if (mode === "server") {
+				server.start(input);
+				return;
+			}
+			const isolateVocals = input.options?.isolateVocals ?? true;
+			const { asr, separation } = models.neededFor(input.lang, isolateVocals);
+			if (asr === null || !asr.available || (isolateVocals && !separation?.available)) {
+				notify.error(
+					"The server does not have the models for this sync. Set the sync to run on the server in Settings.",
+				);
+				return;
+			}
+			browser.start({
+				audioPath: input.audioPath,
+				lyrics: input.lyrics,
+				lang: input.lang,
+				isolateVocals,
+				wordTimestamps: input.options?.wordTimestamps ?? true,
+				leadInMs: input.options?.leadInMs,
+				asr,
+				separation,
+			});
+		},
+		cancel: () => {
+			if (browser.isRunning) browser.cancel();
+			else server.cancel();
+		},
+		isCancelling: server.isCancelling,
+	};
+}
+
+/**
+ * Follows the server sync job of one song (docs/PLAN.md §6.2 `sync.*`, §7.5).
  *
  * The job belongs to the server, not to this screen. The hook holds the id and
  * the path of the job it follows, and the path is what the result is applied
@@ -34,7 +92,7 @@ type Handlers = {
  * When the screen opens on a song that already has a job in the queue, the hook
  * adopts it, so leaving the screen and coming back picks the progress up again.
  */
-export function useSyncJob({ song, onDone, onError }: Handlers) {
+function useServerSyncJob({ song, onDone, onError }: Handlers) {
 	const trpc = useTRPC();
 	const { jobs } = useJobs();
 	const [job, setJob] = useState<{ id: string; audioPath: string } | null>(null);

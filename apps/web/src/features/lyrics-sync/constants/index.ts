@@ -15,12 +15,19 @@ export const AUTOSCROLL_SUSPEND_MS = 3000;
 /** nuqs key that holds the selected audio path in the URL (docs/PLAN.md §13.6). */
 export const SONG_QUERY_KEY = "song";
 
-/** Labels for the stages of a sync job. */
+/**
+ * Labels for the stages of a sync job. `download` and `load` happen only when
+ * the sync runs in this browser.
+ */
 export const SYNC_STAGE_LABELS = {
 	queued: "In the queue",
+	download: "Downloads the models",
+	load: "Loads the models",
 	decode: "Reads the audio",
 	separate: "Isolates the vocals",
 	transcribe: "Listens to the audio",
 	align: "Aligns the lyrics",
 	write: "Writes the .lrc file",
 } as const;
+
+export type SyncProgressStage = keyof typeof SYNC_STAGE_LABELS;

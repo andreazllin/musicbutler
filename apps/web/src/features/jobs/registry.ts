@@ -1,7 +1,7 @@
 import type { JobKind } from "@musicbutler/shared";
 import { IconMusic } from "@tabler/icons-react";
 import type { ComponentType } from "react";
-import { SONG_QUERY_KEY } from "@/features/lyrics-sync/constants";
+import { SONG_QUERY_KEY, SYNC_STAGE_LABELS } from "@/features/lyrics-sync/constants";
 import { encodeBase64Url } from "@/lib/base64url";
 
 /**
@@ -22,21 +22,11 @@ export type JobKindDefinition = {
 	linkTo: (ref: string) => { to: string; search: Record<string, string> } | null;
 };
 
-/** Words for the stages of a lyrics sync, in the order they run. */
-const LYRICS_SYNC_STAGES: Record<string, string> = {
-	queued: "In the queue",
-	decode: "Reads the audio",
-	separate: "Isolates the vocals",
-	transcribe: "Listens to the audio",
-	align: "Aligns the lyrics",
-	write: "Writes the .lrc file",
-};
-
 export const JOB_KIND_UI: Record<JobKind, JobKindDefinition> = {
 	"lyrics-sync": {
 		label: "Lyrics Sync",
 		icon: IconMusic,
-		stageLabel: (stage) => LYRICS_SYNC_STAGES[stage] ?? "Works",
+		stageLabel: (stage) => (SYNC_STAGE_LABELS as Record<string, string>)[stage] ?? "Works",
 		linkTo: (ref) => ({
 			to: "/tools/lyrics-sync",
 			search: { [SONG_QUERY_KEY]: encodeBase64Url(ref) },

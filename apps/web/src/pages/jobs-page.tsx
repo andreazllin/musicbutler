@@ -5,7 +5,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { type FunctionComponent, useEffect, useState } from "react";
 import { JobRow } from "@/features/jobs/components/JobRow";
 import { activeCount, sortForDisplay } from "@/features/jobs/helpers/queue";
-import { useCancelJob, useClearFinishedJobs, useJobs } from "@/features/jobs/hooks/use-jobs";
+import {
+	useAllJobs,
+	useCancelAnyJob,
+	useClearAllFinishedJobs,
+} from "@/features/jobs/hooks/use-all-jobs";
 import { jobKindUi } from "@/features/jobs/registry";
 
 /** How often the run-time counters move while a job is on the screen. */
@@ -13,14 +17,15 @@ const TICK_MS = 1000;
 
 /**
  * The Sync queue screen (docs/PLAN.md §7.1). It shows every job the server
- * holds: the one that runs, the ones that wait, and the ones that finished.
- * The server pushes the list, so this screen does not poll.
+ * holds and every job this browser runs: the ones that run, the ones that
+ * wait, and the ones that finished. The server pushes its list, so this
+ * screen does not poll.
  */
 export const JobsPage: FunctionComponent = () => {
 	const navigate = useNavigate();
-	const { jobs, isPending, isError } = useJobs();
-	const { cancel, pendingId } = useCancelJob();
-	const clearFinished = useClearFinishedJobs();
+	const { jobs, isPending, isError } = useAllJobs();
+	const { cancel, pendingId } = useCancelAnyJob();
+	const clearFinished = useClearAllFinishedJobs();
 
 	// Only the elapsed labels need this clock, and only while a job is active.
 	const hasActive = jobs.some((job) => isActiveJob(job.status));
@@ -123,7 +128,7 @@ const NoJobs: FunctionComponent = () => (
 			</Text>
 			<Text fz="sm" c="dimmed" ta="center">
 				Open a song in Lyrics Sync and select Sync lyrics. The job shows here. You can start more
-				than one job. The server runs them one at a time, in the order you send them.
+				than one job. The app runs them one at a time, in the order you send them.
 			</Text>
 		</Stack>
 	</Center>

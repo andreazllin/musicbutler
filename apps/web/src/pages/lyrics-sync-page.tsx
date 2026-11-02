@@ -1,7 +1,7 @@
 import { Box, Button, Code, Drawer, Flex, Group, Paper, Stack, Text } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { shiftTimestamps } from "@musicbutler/lrc";
-import type { Lang } from "@musicbutler/shared";
+import type { BrowserModel, Lang } from "@musicbutler/shared";
 import { IconDeviceFloppy, IconDownload, IconTrash } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +12,7 @@ import {
 import { AudioPlayer } from "@/features/lyrics-sync/components/AudioPlayer";
 import { ColumnResizer } from "@/features/lyrics-sync/components/ColumnResizer";
 import { ConfirmDialog } from "@/features/lyrics-sync/components/ConfirmDialog";
+import { DownloadModelsDialog } from "@/features/lyrics-sync/components/DownloadModelsDialog";
 import { EditorHeader } from "@/features/lyrics-sync/components/EditorHeader";
 import { FileTree, SurfaceError } from "@/features/lyrics-sync/components/FileTree";
 import { LanguageSelect } from "@/features/lyrics-sync/components/LanguageSelect";
@@ -32,6 +33,7 @@ import { mediaStreamUrl } from "@/lib/axios";
 import { notify } from "@/lib/notify";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import { useLyricsSyncStore } from "@/stores/lyrics-sync-store";
+import { useSettingsStore } from "@/stores/settings-store";
 
 const TREE_MIN = 220;
 const TREE_MAX = 640;
@@ -71,23 +73,29 @@ export const LyricsSyncPage: FunctionComponent = () => {
 	const isolateVocals = useLyricsSyncStore((s) => s.isolateVocals);
 	const wordTimestamps = useLyricsSyncStore((s) => s.wordTimestamps);
 	const setPreviewOffset = useLyricsSyncStore((s) => s.setPreviewOffset);
+	const defaultLang = useSettingsStore((s) => s.defaultLang);
 
 	const [treeWidth, setTreeWidth] = useState(320);
 	const [duration, setDuration] = useState<number | undefined>(undefined);
 	const [lang, setLang] = useState<Lang | null>(null);
 	const [importOpen, setImportOpen] = useState(false);
+	/** The models to download before a browser sync, while the app asks. */
+	const [downloadAsk, setDownloadAsk] = useState<BrowserModel[] | null>(null);
 	// `useMediaQuery` is undefined on the first render, before it can measure.
 	const isNarrow = useMediaQuery(NARROW) ?? false;
 	const [libraryOpen, setLibraryOpen] = useState(false);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 	const editorRef = useRef<LrcEditorHandle | null>(null);
 
-	// Default to the first available language (docs/PLAN.md §7.5).
+	// Start on the default language of the Settings screen when it has a model,
+	// else on the first language that has one (docs/PLAN.md §7.5).
 	useEffect(() => {
 		if (lang !== null || !languages.data) return;
-		const first = languages.data.langs.find((l) => l.available) ?? languages.data.langs[0];
+		const { langs } = languages.data;
+		const preferred = langs.find((l) => l.code === defaultLang && l.available);
+		const first = preferred ?? langs.find((l) => l.available) ?? langs[0];
 		if (first) setLang(first.code);
-	}, [lang, languages.data]);
+	}, [lang, languages.data, defaultLang]);
 
 	const savedContent = lrc.data?.content ?? "";
 	const bufferActive = song !== null && buffer !== null && bufferPath === song;
@@ -176,9 +184,19 @@ export const LyricsSyncPage: FunctionComponent = () => {
 		void lrc.refetch();
 	};
 
-	const startSync = () => {
+	/**
+	 * Starts the sync. A sync in this browser that lacks a model asks first, and
+	 * `downloadConfirmed` is that yes.
+	 */
+	const startSync = (downloadConfirmed = false) => {
 		if (!song || !lang) return;
 		setConfirmSyncOpen(false);
+		const missing = sync.missingModels(lang, isolateVocals);
+		if (!downloadConfirmed && missing.length > 0) {
+			setDownloadAsk(missing);
+			return;
+		}
+		setDownloadAsk(null);
 		sync.start({
 			audioPath: song,
 			lyrics: editorText,
@@ -377,7 +395,13 @@ export const LyricsSyncPage: FunctionComponent = () => {
 			<SyncConfirmDialog
 				isOpen={confirmSyncOpen}
 				onOpenChange={setConfirmSyncOpen}
-				onConfirm={startSync}
+				onConfirm={() => startSync()}
+			/>
+
+			<DownloadModelsDialog
+				models={downloadAsk}
+				onClose={() => setDownloadAsk(null)}
+				onConfirm={() => startSync(true)}
 			/>
 
 			<ConfirmDialog
